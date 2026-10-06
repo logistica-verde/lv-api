@@ -1,5 +1,6 @@
 package br.com.greenvrp.api;
 
+import br.com.greenvrp.blockchain.LedgerException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -16,6 +17,11 @@ public class ApiExceptionHandler {
 	@ExceptionHandler(InvalidRequestException.class)
 	public ProblemDetail handleInvalidRequest(InvalidRequestException exception) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());
+	}
+
+	@ExceptionHandler(LedgerException.class)
+	public ProblemDetail handleLedgerUnavailable(LedgerException exception) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage());
 	}
 
 }
