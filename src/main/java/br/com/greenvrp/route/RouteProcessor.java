@@ -1,5 +1,6 @@
 package br.com.greenvrp.route;
 
+import br.com.greenvrp.blockchain.BlockchainService;
 import br.com.greenvrp.deliverypoint.DeliveryPoint;
 import br.com.greenvrp.geo.GeoQueryService;
 import br.com.greenvrp.geo.PairSegment;
@@ -44,6 +45,7 @@ public class RouteProcessor {
 	private final OperationRepository operationRepository;
 	private final GeoQueryService geoQueryService;
 	private final OptimizerClient optimizerClient;
+	private final BlockchainService blockchainService;
 	private final TransactionTemplate transactions;
 	private final Executor executor;
 
@@ -51,11 +53,13 @@ public class RouteProcessor {
 		OperationRepository operationRepository,
 		GeoQueryService geoQueryService,
 		OptimizerClient optimizerClient,
+		BlockchainService blockchainService,
 		PlatformTransactionManager transactionManager,
 		@Qualifier("routeExecutor") Executor executor) {
 		this.operationRepository = operationRepository;
 		this.geoQueryService = geoQueryService;
 		this.optimizerClient = optimizerClient;
+		this.blockchainService = blockchainService;
 		this.transactions = new TransactionTemplate(transactionManager);
 		this.executor = executor;
 	}
@@ -64,10 +68,16 @@ public class RouteProcessor {
 		return CompletableFuture.supplyAsync(() -> prepare(operationId), executor)
 			.thenCompose(prepared -> optimizerClient.optimize(prepared.request())
 				.thenAcceptAsync(response -> complete(operationId, prepared, response), executor))
+			.thenApply(done -> true)
 			.exceptionally(error -> {
 				markFailed(operationId, error);
-				return null;
-			});
+				return false;
+			})
+			.thenAcceptAsync(completed -> {
+				if (completed) {
+					blockchainService.anchorOperation(operationId);
+				}
+			}, executor);
 	}
 
 	private Prepared prepare(Long operationId) {

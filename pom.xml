@@ -17,6 +17,7 @@
 		<java.version>17</java.version>
 		<hibernate-spatial.version>7.4.5.Final</hibernate-spatial.version>
 		<mssql-jdbc.version>12.10.0.jre11</mssql-jdbc.version>
+		<web3j.version>5.0.0</web3j.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -44,6 +45,11 @@
 			<groupId>org.hibernate.orm</groupId>
 			<artifactId>hibernate-spatial</artifactId>
 			<version>${hibernate-spatial.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.web3j</groupId>
+			<artifactId>core</artifactId>
+			<version>${web3j.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>com.h2database</groupId>
