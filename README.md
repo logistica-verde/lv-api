@@ -29,16 +29,21 @@ A aplicacao sobe em `http://localhost:8080`.
 
 ## Configuracao
 
-Variaveis esperadas em `application-local.properties` (nao versionado):
+A aplicacao le variaveis de ambiente (ou, alternativamente, as propriedades equivalentes em `application-local.properties`, nao versionado):
 
-```
-spring.datasource.url=jdbc:sqlserver://localhost:1433;databaseName=logistica_verde
-spring.datasource.username=
-spring.datasource.password=
-optimizer.url=http://localhost:8000
-besu.rpc.url=http://localhost:8545
-jwt.secret=
-```
+| Variavel | Padrao | Descricao |
+|---|---|---|
+| `DB_URL` | `jdbc:sqlserver://localhost:1433;databaseName=logistica_verde;...` | JDBC do SQL Server |
+| `DB_USERNAME` / `DB_PASSWORD` | vazio | Credenciais do banco |
+| `OPTIMIZER_URL` | `http://localhost:8000` | URL do `lv-optimizer` |
+| `BESU_RPC_URL` | `http://localhost:8545` | JSON-RPC do no Besu |
+| `BESU_CHAIN_ID` | `1337` | Chain ID da rede Besu |
+| `BESU_CONTRACT_ADDRESS` | vazio | Endereco do contrato `AuditRegistry` ja implantado |
+| `BESU_PRIVATE_KEY` | vazio | Chave privada da conta que assina as transacoes de ancoragem |
+
+## Contrato de auditoria
+
+`contracts/AuditRegistry.sol` guarda o hash SHA-256 de cada operacao (`anchor` e `getHash`). Ele precisa ser compilado e implantado na rede Besu, e o endereco informado em `BESU_CONTRACT_ADDRESS`. Sem isso a rota e calculada normalmente, mas o registro de integridade fica com status `FAILED` e `GET /api/routes/{id}/integrity` responde `503`.
 
 ## Papeis de acesso
 
