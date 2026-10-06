@@ -5,8 +5,11 @@ import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import br.com.greenvrp.blockchain.BlockchainService;
 import br.com.greenvrp.deliverypoint.DeliveryPoint;
 import br.com.greenvrp.deliverypoint.DeliveryPointRepository;
 import br.com.greenvrp.geo.GeoQueryService;
@@ -50,6 +53,7 @@ class RouteProcessorTest {
 
 	private final GeoQueryService geoQueryService = mock(GeoQueryService.class);
 	private final OptimizerClient optimizerClient = mock(OptimizerClient.class);
+	private final BlockchainService blockchainService = mock(BlockchainService.class);
 
 	private RouteProcessor processor;
 	private Long operationId;
@@ -58,7 +62,7 @@ class RouteProcessorTest {
 	@BeforeEach
 	void setUp() {
 		processor = new RouteProcessor(
-			operationRepository, geoQueryService, optimizerClient, transactionManager, Runnable::run);
+			operationRepository, geoQueryService, optimizerClient, blockchainService, transactionManager, Runnable::run);
 
 		Vehicle vehicle = vehicleRepository.save(new Vehicle("ABC1D23", 7500.0, "diesel"));
 		List<DeliveryPoint> points = List.of(
@@ -105,6 +109,7 @@ class RouteProcessorTest {
 
 		processor.processAsync(operationId).join();
 
+		verify(blockchainService).anchorOperation(operationId);
 		inTransaction(() -> {
 			Operation operation = operationRepository.findById(operationId).orElseThrow();
 			assertThat(operation.getStatus()).isEqualTo(OperationStatus.COMPLETED);
@@ -136,6 +141,7 @@ class RouteProcessorTest {
 		Operation operation = operationRepository.findById(operationId).orElseThrow();
 		assertThat(operation.getStatus()).isEqualTo(OperationStatus.FAILED);
 		assertThat(operation.getMensagemErro()).contains("connection refused");
+		verifyNoInteractions(blockchainService);
 	}
 
 	@Test
@@ -149,6 +155,7 @@ class RouteProcessorTest {
 		Operation operation = operationRepository.findById(operationId).orElseThrow();
 		assertThat(operation.getStatus()).isEqualTo(OperationStatus.FAILED);
 		assertThat(operation.getMensagemErro()).contains("invalid visiting sequence");
+		verifyNoInteractions(blockchainService);
 	}
 
 	@Test
@@ -162,6 +169,7 @@ class RouteProcessorTest {
 		Operation operation = operationRepository.findById(operationId).orElseThrow();
 		assertThat(operation.getStatus()).isEqualTo(OperationStatus.FAILED);
 		assertThat(operation.getMensagemErro()).contains("no emission for leg 1 -> 2");
+		verifyNoInteractions(blockchainService);
 	}
 
 	@Test
@@ -174,6 +182,7 @@ class RouteProcessorTest {
 		Operation operation = operationRepository.findById(operationId).orElseThrow();
 		assertThat(operation.getStatus()).isEqualTo(OperationStatus.FAILED);
 		assertThat(operation.getMensagemErro()).contains("No road segment found");
+		verifyNoInteractions(blockchainService);
 	}
 
 }
