@@ -18,6 +18,7 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -66,7 +67,7 @@ public class Operation {
 		Operation operation = new Operation();
 		operation.vehicle = vehicle;
 		operation.criterio = criterion;
-		operation.dataHora = Instant.now();
+		operation.dataHora = Instant.now().truncatedTo(ChronoUnit.MILLIS);
 		operation.status = OperationStatus.PENDING;
 		for (int index = 0; index < points.size(); index++) {
 			operation.points.add(new OperationPoint(operation, points.get(index), index + 1));
