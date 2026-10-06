@@ -1,0 +1,179 @@
+package br.com.greenvrp.route;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import br.com.greenvrp.deliverypoint.DeliveryPoint;
+import br.com.greenvrp.deliverypoint.DeliveryPointRepository;
+import br.com.greenvrp.geo.GeoQueryService;
+import br.com.greenvrp.geo.PairSegment;
+import br.com.greenvrp.geo.RoadDataNotFoundException;
+import br.com.greenvrp.optimizer.OptimizationCriterion;
+import br.com.greenvrp.optimizer.OptimizeResponse;
+import br.com.greenvrp.optimizer.OptimizeResponse.SegmentEmission;
+import br.com.greenvrp.optimizer.OptimizerClient;
+import br.com.greenvrp.optimizer.OptimizerException;
+import br.com.greenvrp.vehicle.Vehicle;
+import br.com.greenvrp.vehicle.VehicleRepository;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
+
+@DataJpaTest
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
+class RouteProcessorTest {
+
+	@Autowired
+	private OperationRepository operationRepository;
+
+	@Autowired
+	private VehicleRepository vehicleRepository;
+
+	@Autowired
+	private DeliveryPointRepository deliveryPointRepository;
+
+	@Autowired
+	private PlatformTransactionManager transactionManager;
+
+	private final GeoQueryService geoQueryService = mock(GeoQueryService.class);
+	private final OptimizerClient optimizerClient = mock(OptimizerClient.class);
+
+	private RouteProcessor processor;
+	private Long operationId;
+	private List<Long> pointIds;
+
+	@BeforeEach
+	void setUp() {
+		processor = new RouteProcessor(
+			operationRepository, geoQueryService, optimizerClient, transactionManager, Runnable::run);
+
+		Vehicle vehicle = vehicleRepository.save(new Vehicle("ABC1D23", 7500.0, "diesel"));
+		List<DeliveryPoint> points = List.of(
+			deliveryPointRepository.save(new DeliveryPoint("P1", null, -23.55, -46.63)),
+			deliveryPointRepository.save(new DeliveryPoint("P2", null, -23.56, -46.64)),
+			deliveryPointRepository.save(new DeliveryPoint("P3", null, -23.57, -46.65)));
+		pointIds = points.stream().map(DeliveryPoint::getId).toList();
+		operationId = operationRepository
+			.save(Operation.pending(vehicle, OptimizationCriterion.EMISSION, points))
+			.getId();
+
+		when(geoQueryService.buildPairSegments(anyList())).thenReturn(allPairs(3));
+	}
+
+	@AfterEach
+	void cleanUp() {
+		operationRepository.deleteAll();
+		deliveryPointRepository.deleteAll();
+		vehicleRepository.deleteAll();
+	}
+
+	private List<PairSegment> allPairs(int count) {
+		List<PairSegment> pairs = new ArrayList<>();
+		for (int from = 0; from < count; from++) {
+			for (int to = 0; to < count; to++) {
+				if (from != to) {
+					pairs.add(new PairSegment(from, to, 1000.0 + from * 10 + to, 40.0, 2.0));
+				}
+			}
+		}
+		return pairs;
+	}
+
+	private <T> T inTransaction(java.util.function.Supplier<T> action) {
+		return new TransactionTemplate(transactionManager).execute(status -> action.get());
+	}
+
+	@Test
+	void completesOperationAndPersistsOptimizedVisitOrderAndSegments() {
+		OptimizeResponse response = new OptimizeResponse(
+			List.of(1, 0, 2), 5.5, 2010.0,
+			List.of(new SegmentEmission(1, 0, 2.0), new SegmentEmission(0, 2, 3.5)));
+		when(optimizerClient.optimize(any())).thenReturn(CompletableFuture.completedFuture(response));
+
+		processor.processAsync(operationId).join();
+
+		inTransaction(() -> {
+			Operation operation = operationRepository.findById(operationId).orElseThrow();
+			assertThat(operation.getStatus()).isEqualTo(OperationStatus.COMPLETED);
+			assertThat(operation.getEmissaoTotalKg()).isEqualTo(5.5);
+			assertThat(operation.getMensagemErro()).isNull();
+			assertThat(operation.getPoints())
+				.extracting(item -> item.getPoint().getNome(), OperationPoint::getOrdemVisita)
+				.containsExactlyInAnyOrder(tuple("P2", 1), tuple("P1", 2), tuple("P3", 3));
+			assertThat(operation.getSegments())
+				.extracting(
+					segment -> segment.getOrigin().getId(),
+					segment -> segment.getDestination().getId(),
+					RouteSegment::getEmissaoKgCo2,
+					RouteSegment::getDistanciaMetros)
+				.containsExactly(
+					tuple(pointIds.get(1), pointIds.get(0), 2.0, 1010.0),
+					tuple(pointIds.get(0), pointIds.get(2), 3.5, 1002.0));
+			return null;
+		});
+	}
+
+	@Test
+	void marksOperationFailedWhenOptimizerCallFails() {
+		when(optimizerClient.optimize(any())).thenReturn(CompletableFuture.failedFuture(
+			new OptimizerException("Optimizer call failed: connection refused", new RuntimeException())));
+
+		processor.processAsync(operationId).join();
+
+		Operation operation = operationRepository.findById(operationId).orElseThrow();
+		assertThat(operation.getStatus()).isEqualTo(OperationStatus.FAILED);
+		assertThat(operation.getMensagemErro()).contains("connection refused");
+	}
+
+	@Test
+	void marksOperationFailedWhenOptimizerReturnsInvalidSequence() {
+		OptimizeResponse response = new OptimizeResponse(
+			List.of(0, 0, 1), 5.5, 2010.0, List.of(new SegmentEmission(0, 1, 2.0)));
+		when(optimizerClient.optimize(any())).thenReturn(CompletableFuture.completedFuture(response));
+
+		processor.processAsync(operationId).join();
+
+		Operation operation = operationRepository.findById(operationId).orElseThrow();
+		assertThat(operation.getStatus()).isEqualTo(OperationStatus.FAILED);
+		assertThat(operation.getMensagemErro()).contains("invalid visiting sequence");
+	}
+
+	@Test
+	void marksOperationFailedWhenOptimizerOmitsALegEmission() {
+		OptimizeResponse response = new OptimizeResponse(
+			List.of(0, 1, 2), 5.5, 2010.0, List.of(new SegmentEmission(0, 1, 2.0)));
+		when(optimizerClient.optimize(any())).thenReturn(CompletableFuture.completedFuture(response));
+
+		processor.processAsync(operationId).join();
+
+		Operation operation = operationRepository.findById(operationId).orElseThrow();
+		assertThat(operation.getStatus()).isEqualTo(OperationStatus.FAILED);
+		assertThat(operation.getMensagemErro()).contains("no emission for leg 1 -> 2");
+	}
+
+	@Test
+	void marksOperationFailedWhenAPointHasNoRoadData() {
+		when(geoQueryService.buildPairSegments(anyList()))
+			.thenThrow(new RoadDataNotFoundException("No road segment found for delivery point 'P1'"));
+
+		processor.processAsync(operationId).join();
+
+		Operation operation = operationRepository.findById(operationId).orElseThrow();
+		assertThat(operation.getStatus()).isEqualTo(OperationStatus.FAILED);
+		assertThat(operation.getMensagemErro()).contains("No road segment found");
+	}
+
+}
