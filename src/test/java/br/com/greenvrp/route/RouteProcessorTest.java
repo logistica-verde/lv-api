@@ -139,6 +139,45 @@ class RouteProcessorTest {
 	}
 
 	@Test
+	void recordsHowLongTheOptimizerTook() {
+		OptimizeResponse response = new OptimizeResponse(
+			List.of(1, 0, 2), 5.5, 2010.0,
+			List.of(new SegmentEmission(1, 0, 2.0), new SegmentEmission(0, 2, 3.5)));
+		when(optimizerClient.optimize(any())).thenReturn(CompletableFuture.supplyAsync(() -> {
+			try {
+				Thread.sleep(60);
+			}
+			catch (InterruptedException interrupted) {
+				Thread.currentThread().interrupt();
+			}
+			return response;
+		}));
+
+		processor.processAsync(operationId).join();
+
+		inTransaction(() -> {
+			Operation operation = operationRepository.findById(operationId).orElseThrow();
+			assertThat(operation.getTempoExecucaoMs()).isGreaterThanOrEqualTo(50).isLessThan(5000);
+			return null;
+		});
+	}
+
+	@Test
+	void leavesTheExecutionTimeEmptyWhenTheOperationFails() {
+		when(optimizerClient.optimize(any())).thenReturn(CompletableFuture.failedFuture(
+			new OptimizerException("Optimizer call failed: boom", new RuntimeException())));
+
+		processor.processAsync(operationId).join();
+
+		inTransaction(() -> {
+			Operation operation = operationRepository.findById(operationId).orElseThrow();
+			assertThat(operation.getStatus()).isEqualTo(OperationStatus.FAILED);
+			assertThat(operation.getTempoExecucaoMs()).isNull();
+			return null;
+		});
+	}
+
+	@Test
 	void sendsTheConfiguredGeneticAlgorithmParametersToTheOptimizer() {
 		when(gaSettingsService.current()).thenReturn(new GaSettingsValues(250, 400, 0.9, 0.1));
 		when(optimizerClient.optimize(any())).thenReturn(CompletableFuture.failedFuture(
