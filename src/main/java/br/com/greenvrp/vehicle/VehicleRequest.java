@@ -14,7 +14,9 @@ public record VehicleRequest(
 	Double massaKg,
 
 	@NotBlank
-	String tipoCombustivel
+	String tipoCombustivel,
+
+	VehicleImage imagem
 
 ) {
 }
