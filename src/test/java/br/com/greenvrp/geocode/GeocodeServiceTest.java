@@ -202,6 +202,15 @@ class GeocodeServiceTest {
 	}
 
 	@Test
+	void treatsTabsAndLineBreaksAsSpaces() {
+		given(client.search("Rua Augusta 100")).willReturn(List.of(SE));
+
+		service(10).search("Rua\tAugusta\n 100");
+
+		verify(client).search("Rua Augusta 100");
+	}
+
+	@Test
 	void sendsTheTrimmedQueryToTheProvider() {
 		given(client.search("Rua Augusta, 100")).willReturn(List.of(SE));
 
