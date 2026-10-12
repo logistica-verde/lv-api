@@ -1,8 +1,11 @@
 package br.com.greenvrp.auth;
 
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -207,6 +210,26 @@ class SecurityRulesTest {
 		getAs(Role.OPERATOR, "/api/routes/999/integrity").andExpect(status().isForbidden());
 		getAs(Role.AUDITOR, "/api/routes/999/integrity").andExpect(status().isNotFound());
 		getAs(Role.ADMIN, "/api/routes/999/integrity").andExpect(status().isNotFound());
+	}
+
+	@Test
+	void administratorsListAndChangeUsersThroughTheApi() throws Exception {
+		AppUser operator = user(Role.OPERATOR);
+
+		getAs(Role.ADMIN, "/api/users")
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$[?(@.email == '" + operator.getEmail() + "')].perfil").value("OPERATOR"))
+			.andExpect(content().string(not(containsString("senhaHash"))))
+			.andExpect(content().string(not(containsString("$2a$"))));
+
+		mockMvc.perform(patch("/api/users/" + operator.getId()).header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN))
+				.contentType(MediaType.APPLICATION_JSON).content("{\"perfil\":\"AUDITOR\",\"ativo\":false}"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.perfil").value("AUDITOR"))
+			.andExpect(jsonPath("$.ativo").value(false));
+		mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+				.content("{\"email\":\"" + operator.getEmail() + "\",\"senha\":\"" + PASSWORD + "\"}"))
+			.andExpect(status().isForbidden());
 	}
 
 	@Test
