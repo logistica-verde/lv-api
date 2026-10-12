@@ -271,6 +271,15 @@ class SecurityRulesTest {
 	}
 
 	@Test
+	void everyProfileCanReadTheLatestExperimentButItNeedsAToken() throws Exception {
+		mockMvc.perform(get("/api/experiments/latest")).andExpect(status().isUnauthorized());
+		for (Role role : Role.values()) {
+			int status = getAs(role, "/api/experiments/latest").andReturn().getResponse().getStatus();
+			org.assertj.core.api.Assertions.assertThat(status).isIn(200, 404);
+		}
+	}
+
+	@Test
 	void keepsUserAndSettingsAdministrationToAdministrators() throws Exception {
 		for (String path : new String[] {"/api/users", "/api/settings/ga"}) {
 			getAs(Role.OPERATOR, path).andExpect(status().isForbidden());
