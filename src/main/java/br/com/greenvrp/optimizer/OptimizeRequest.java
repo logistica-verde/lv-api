@@ -11,7 +11,8 @@ public record OptimizeRequest(
 	@JsonProperty("vehicle_mass_kg") double vehicleMassKg,
 	@JsonProperty("point_count") int pointCount,
 	List<Segment> segments,
-	@JsonProperty("ga_params") @JsonInclude(JsonInclude.Include.NON_NULL) GaParams gaParams
+	@JsonProperty("ga_params") @JsonInclude(JsonInclude.Include.NON_NULL) GaParams gaParams,
+	@JsonProperty("seed") @JsonInclude(JsonInclude.Include.NON_NULL) Long seed
 
 ) {
 
@@ -47,12 +48,19 @@ public record OptimizeRequest(
 	public static OptimizeRequest of(
 		OptimizationCriterion criterion, double vehicleMassKg, int pointCount, List<PairSegment> pairs,
 		GaParams gaParams) {
+		return of(criterion, vehicleMassKg, pointCount, pairs, gaParams, null);
+	}
+
+	public static OptimizeRequest of(
+		OptimizationCriterion criterion, double vehicleMassKg, int pointCount, List<PairSegment> pairs,
+		GaParams gaParams, Long seed) {
 		return new OptimizeRequest(
 			criterion.wireValue(),
 			vehicleMassKg,
 			pointCount,
 			pairs.stream().map(Segment::from).toList(),
-			gaParams);
+			gaParams,
+			seed);
 	}
 
 }
