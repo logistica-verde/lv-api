@@ -1,5 +1,7 @@
 package br.com.greenvrp.api;
 
+import br.com.greenvrp.auth.InactiveUserException;
+import br.com.greenvrp.auth.InvalidCredentialsException;
 import br.com.greenvrp.blockchain.LedgerException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -22,6 +24,16 @@ public class ApiExceptionHandler {
 	@ExceptionHandler(LedgerException.class)
 	public ProblemDetail handleLedgerUnavailable(LedgerException exception) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage());
+	}
+
+	@ExceptionHandler(InvalidCredentialsException.class)
+	public ProblemDetail handleInvalidCredentials(InvalidCredentialsException exception) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, exception.getMessage());
+	}
+
+	@ExceptionHandler(InactiveUserException.class)
+	public ProblemDetail handleInactiveUser(InactiveUserException exception) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, exception.getMessage());
 	}
 
 }
