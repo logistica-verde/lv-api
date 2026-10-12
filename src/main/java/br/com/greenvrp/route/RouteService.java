@@ -6,8 +6,11 @@ import br.com.greenvrp.deliverypoint.DeliveryPoint;
 import br.com.greenvrp.deliverypoint.DeliveryPointRepository;
 import br.com.greenvrp.vehicle.Vehicle;
 import br.com.greenvrp.vehicle.VehicleRepository;
+import br.com.greenvrp.optimizer.OptimizationCriterion;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,6 +54,36 @@ public class RouteService {
 		Operation operation = operationRepository.findById(id)
 			.orElseThrow(() -> new ResourceNotFoundException("Route operation %d not found".formatted(id)));
 		return RouteResponse.from(operation);
+	}
+
+	@Transactional(readOnly = true)
+	public RouteComparisonResponse compare(Long emissionId, Long distanceId) {
+		Operation emission = find(emissionId);
+		Operation distance = find(distanceId);
+		if (emission.getCriterio() != OptimizationCriterion.EMISSION) {
+			throw new InvalidRequestException("Operation %d is not an emission route".formatted(emissionId));
+		}
+		if (distance.getCriterio() != OptimizationCriterion.DISTANCE) {
+			throw new InvalidRequestException("Operation %d is not a distance route".formatted(distanceId));
+		}
+		if (!emission.getVehicle().getId().equals(distance.getVehicle().getId())) {
+			throw new InvalidRequestException("The routes were calculated for different vehicles");
+		}
+		if (!pointIdsOf(emission).equals(pointIdsOf(distance))) {
+			throw new InvalidRequestException("The routes were calculated for different delivery points");
+		}
+		return new RouteComparisonResponse(RouteResponse.from(emission), RouteResponse.from(distance));
+	}
+
+	private Operation find(Long id) {
+		return operationRepository.findById(id)
+			.orElseThrow(() -> new ResourceNotFoundException("Route operation %d not found".formatted(id)));
+	}
+
+	private Set<Long> pointIdsOf(Operation operation) {
+		return operation.getPoints().stream()
+			.map(item -> item.getPoint().getId())
+			.collect(Collectors.toSet());
 	}
 
 	private DeliveryPoint activePoint(Long id) {

@@ -19,6 +19,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
@@ -71,8 +72,11 @@ public class RouteProcessor {
 
 	public CompletableFuture<Void> processAsync(Long operationId) {
 		return CompletableFuture.supplyAsync(() -> prepare(operationId), executor)
-			.thenCompose(prepared -> optimizerClient.optimize(prepared.request())
-				.thenAcceptAsync(response -> complete(operationId, prepared, response), executor))
+			.thenCompose(prepared -> {
+				long startedAt = System.nanoTime();
+				return optimizerClient.optimize(prepared.request())
+					.thenAcceptAsync(response -> complete(operationId, prepared, response, elapsedMillis(startedAt)), executor);
+			})
 			.thenApply(done -> true)
 			.exceptionally(error -> {
 				markFailed(operationId, error);
@@ -99,7 +103,11 @@ public class RouteProcessor {
 		});
 	}
 
-	private void complete(Long operationId, Prepared prepared, OptimizeResponse response) {
+	private static long elapsedMillis(long startedAtNanos) {
+		return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAtNanos);
+	}
+
+	private void complete(Long operationId, Prepared prepared, OptimizeResponse response, long executionMillis) {
 		transactions.executeWithoutResult(status -> {
 			Operation operation = loadOperation(operationId);
 			List<DeliveryPoint> points = pointsOf(operation);
@@ -133,6 +141,7 @@ public class RouteProcessor {
 				.toList();
 
 			operation.complete(response.totalEmissionKg(), sequence, legs);
+			operation.registrarTempoExecucao(executionMillis);
 		});
 	}
 
