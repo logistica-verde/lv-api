@@ -57,7 +57,30 @@ O schema e versionado com Flyway em `src/main/resources/db/migration` (arquivos 
 
 ## Contrato de auditoria
 
-`contracts/AuditRegistry.sol` guarda o hash SHA-256 de cada operacao (`anchor` e `getHash`). Ele precisa ser compilado e implantado na rede Besu, e o endereco informado em `BESU_CONTRACT_ADDRESS`. Sem isso a rota e calculada normalmente, mas o registro de integridade fica com status `FAILED` e `GET /api/routes/{id}/integrity` responde `503`.
+`contracts/AuditRegistry.sol` guarda o hash SHA-256 de cada operacao (`anchor` e `getHash`). Ele precisa estar implantado na rede Besu, com o endereco informado em `BESU_CONTRACT_ADDRESS`. Sem isso a rota e calculada normalmente, mas o registro de integridade fica com status `FAILED`, `GET /api/routes/{id}/integrity` responde `503` e a aplicacao registra um aviso na subida.
+
+O contrato ja vem compilado em `src/main/resources/contracts/AuditRegistry.bin` (e o ABI em `AuditRegistry.abi`), gerado com o solc 0.8.28. Um teste confere que o bytecode atende as funcoes que o `BesuLedger` chama.
+
+### Implantar o contrato
+
+Com o no Besu no ar e uma conta com fundos (ou com `BESU_GAS_PRICE=0`, o padrao), rode:
+
+```bash
+BESU_RPC_URL=http://localhost:8545 BESU_CHAIN_ID=1337 BESU_PRIVATE_KEY=<chave da conta> \
+  ./mvnw spring-boot:run -Dspring-boot.run.main-class=br.com.greenvrp.blockchain.AuditRegistryDeployCli
+```
+
+Se der certo, a saida traz a linha `BESU_CONTRACT_ADDRESS=0x...`; use esse valor na configuracao da aplicacao. Se falhar, a mensagem explica o motivo (chave ausente, transacao recusada ou revertida, rede indisponivel) e o Maven termina com `BUILD FAILURE`. O comando nao usa o banco de dados.
+
+### Recompilar o contrato
+
+Se alterar `contracts/AuditRegistry.sol`, recompile e substitua os dois arquivos em `src/main/resources/contracts`:
+
+```bash
+npx solc@0.8.28 --bin --abi -o build contracts/AuditRegistry.sol
+```
+
+O solc-js nomeia os arquivos com o caminho de origem; renomeie para `AuditRegistry.bin` e `AuditRegistry.abi`. Contratos ja implantados nao mudam: uma alteracao exige novo deploy e novo `BESU_CONTRACT_ADDRESS`.
 
 ## Autenticacao e papeis de acesso
 
