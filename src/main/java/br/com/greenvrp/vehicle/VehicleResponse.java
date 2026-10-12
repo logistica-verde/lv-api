@@ -6,6 +6,7 @@ public record VehicleResponse(
 	String placa,
 	Double massaKg,
 	String tipoCombustivel,
+	VehicleImage imagem,
 	boolean ativo
 
 ) {
@@ -16,6 +17,7 @@ public record VehicleResponse(
 			vehicle.getPlaca(),
 			vehicle.getMassaKg(),
 			vehicle.getTipoCombustivel(),
+			vehicle.getImagem(),
 			vehicle.isAtivo()
 		);
 	}

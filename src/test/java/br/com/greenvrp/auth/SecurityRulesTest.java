@@ -157,6 +157,32 @@ class SecurityRulesTest {
 	}
 
 	@Test
+	void administratorsDeactivateAndReactivateARegisteredVehicle() throws Exception {
+		String created = mockMvc.perform(post("/api/vehicles").header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"placa\":\"PAT1A11\",\"massaKg\":1000.0,\"tipoCombustivel\":\"diesel\",\"imagem\":\"pickup\"}"))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.imagem").value("pickup"))
+			.andReturn().getResponse().getContentAsString();
+		int id = com.jayway.jsonpath.JsonPath.read(created, "$.id");
+
+		mockMvc.perform(patch("/api/vehicles/" + id).header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN))
+				.contentType(MediaType.APPLICATION_JSON).content("{\"ativo\":false}"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.ativo").value(false));
+		getAs(Role.OPERATOR, "/api/vehicles")
+			.andExpect(jsonPath("$[?(@.id == " + id + ")]").isEmpty());
+		getAs(Role.ADMIN, "/api/vehicles?includeInactive=true")
+			.andExpect(jsonPath("$[?(@.id == " + id + ")].ativo").value(false));
+
+		mockMvc.perform(patch("/api/vehicles/" + id).header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN))
+				.contentType(MediaType.APPLICATION_JSON).content("{\"ativo\":true}"))
+			.andExpect(jsonPath("$.ativo").value(true));
+		getAs(Role.OPERATOR, "/api/vehicles")
+			.andExpect(jsonPath("$[?(@.id == " + id + ")]").isNotEmpty());
+	}
+
+	@Test
 	void auditorsCannotRegisterDeliveryPointsOrCalculateRoutes() throws Exception {
 		mockMvc.perform(post("/api/delivery-points").header(HttpHeaders.AUTHORIZATION, bearer(Role.AUDITOR))
 				.contentType(MediaType.APPLICATION_JSON)
