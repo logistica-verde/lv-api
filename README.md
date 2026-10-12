@@ -45,6 +45,19 @@ A aplicacao le variaveis de ambiente (ou, alternativamente, as propriedades equi
 | `JWT_EXPIRATION` | `8h` | Validade do token (formato de duracao, por exemplo `30m`) |
 | `LV_ADMIN_EMAIL` / `LV_ADMIN_PASSWORD` | vazio | Se a tabela de usuarios estiver vazia, cria o primeiro administrador com esses dados |
 | `LV_ADMIN_NAME` | `Administrador` | Nome do primeiro administrador |
+| `LV_GEOCODER_URL` | `https://nominatim.openstreetmap.org/search` | Provedor da busca de enderecos (formato Nominatim) |
+| `LV_GEOCODER_USER_AGENT` | `lv-api/1.0 (Logistica Verde Inteligente)` | Identificacao enviada ao provedor; troque pelo nome e contato reais do projeto |
+
+## Busca de enderecos
+
+`GET /api/geocode?q=<endereco>` (qualquer usuario autenticado) faz a busca no provedor configurado e devolve a lista no formato do Nominatim, `[{"display_name", "lat", "lon"}]`, limitada a 5 resultados no Brasil. A API faz o papel de intermediaria porque o navegador nao consegue enviar o `User-Agent` que o Nominatim publico exige, e para respeitar a politica de uso dele:
+
+- no maximo uma consulta por segundo ao provedor (`lv.geocoder.min-interval`, padrao 1100 ms): consultas seguidas esperam a sua vez
+- cache em memoria das buscas repetidas, ignorando maiusculas e espacos extras (`lv.geocoder.cache-ttl`, padrao 24 h, ate 500 buscas)
+- `q` com 3 a 200 caracteres; fora disso, `400`
+- provedor fora do ar, lento (`lv.geocoder.timeout`, padrao 5 s) ou respondendo erro: `503` ("The address search service is unavailable.")
+
+Trocar de provedor (por exemplo um Nominatim proprio) e so mudar `LV_GEOCODER_URL`; o front nao muda.
 
 ## Banco de dados e migrations
 
