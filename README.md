@@ -41,6 +41,15 @@ A aplicacao le variaveis de ambiente (ou, alternativamente, as propriedades equi
 | `BESU_CONTRACT_ADDRESS` | vazio | Endereco do contrato `AuditRegistry` ja implantado |
 | `BESU_PRIVATE_KEY` | vazio | Chave privada da conta que assina as transacoes de ancoragem |
 
+## Banco de dados e migrations
+
+O schema e versionado com Flyway em `src/main/resources/db/migration` (arquivos `V<numero>__<descricao>.sql`, escritos para SQL Server). Ao subir, a aplicacao aplica as migrations pendentes e o Hibernate apenas valida (`ddl-auto=validate`).
+
+- Banco novo: a `V1__initial_schema.sql` cria todas as tabelas.
+- Banco que ja existe com as tabelas atuais: o Flyway marca a versao 1 como aplicada (`baseline-on-migrate`) e executa so as migrations seguintes.
+- Nunca edite uma migration ja publicada; crie uma nova.
+- Os testes usam H2 em modo SQL Server. A `SchemaMigrationTest` roda as migrations nele e confere que as entidades validam contra o resultado. O H2 nao substitui o SQL Server: antes de publicar uma migration nova, rode-a tambem num SQL Server de verdade.
+
 ## Contrato de auditoria
 
 `contracts/AuditRegistry.sol` guarda o hash SHA-256 de cada operacao (`anchor` e `getHash`). Ele precisa ser compilado e implantado na rede Besu, e o endereco informado em `BESU_CONTRACT_ADDRESS`. Sem isso a rota e calculada normalmente, mas o registro de integridade fica com status `FAILED` e `GET /api/routes/{id}/integrity` responde `503`.
