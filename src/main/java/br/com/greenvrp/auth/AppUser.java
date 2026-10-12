@@ -72,4 +72,16 @@ public class AppUser {
 		return ativo;
 	}
 
+	public void alterarPerfil(Role novoPerfil) {
+		this.perfil = novoPerfil;
+	}
+
+	public void ativar() {
+		this.ativo = true;
+	}
+
+	public void desativar() {
+		this.ativo = false;
+	}
+
 }
