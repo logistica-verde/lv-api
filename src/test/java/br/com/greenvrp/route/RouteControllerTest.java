@@ -10,17 +10,22 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import br.com.greenvrp.api.InvalidRequestException;
 import br.com.greenvrp.api.ResourceNotFoundException;
+import br.com.greenvrp.auth.SecurityConfig;
 import br.com.greenvrp.optimizer.OptimizationCriterion;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(RouteController.class)
+@Import(SecurityConfig.class)
+@WithMockUser(roles = "ADMIN")
 class RouteControllerTest {
 
 	@Autowired
