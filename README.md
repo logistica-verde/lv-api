@@ -40,6 +40,10 @@ A aplicacao le variaveis de ambiente (ou, alternativamente, as propriedades equi
 | `BESU_CHAIN_ID` | `1337` | Chain ID da rede Besu |
 | `BESU_CONTRACT_ADDRESS` | vazio | Endereco do contrato `AuditRegistry` ja implantado |
 | `BESU_PRIVATE_KEY` | vazio | Chave privada da conta que assina as transacoes de ancoragem |
+| `JWT_SECRET` | sem padrao (obrigatoria) | Segredo HS256 dos tokens, com pelo menos 32 caracteres. A aplicacao nao sobe sem ele |
+| `JWT_EXPIRATION` | `8h` | Validade do token (formato de duracao, por exemplo `30m`) |
+| `LV_ADMIN_EMAIL` / `LV_ADMIN_PASSWORD` | vazio | Se a tabela de usuarios estiver vazia, cria o primeiro administrador com esses dados |
+| `LV_ADMIN_NAME` | `Administrador` | Nome do primeiro administrador |
 
 ## Banco de dados e migrations
 
@@ -54,13 +58,17 @@ O schema e versionado com Flyway em `src/main/resources/db/migration` (arquivos 
 
 `contracts/AuditRegistry.sol` guarda o hash SHA-256 de cada operacao (`anchor` e `getHash`). Ele precisa ser compilado e implantado na rede Besu, e o endereco informado em `BESU_CONTRACT_ADDRESS`. Sem isso a rota e calculada normalmente, mas o registro de integridade fica com status `FAILED` e `GET /api/routes/{id}/integrity` responde `503`.
 
-## Papeis de acesso
+## Autenticacao e papeis de acesso
+
+`POST /api/auth/login` recebe `{"email", "senha"}` e devolve `{"token", "usuario": {"id", "nome", "email", "perfil"}}`. O token e um JWT e vai em `Authorization: Bearer <token>` nas demais chamadas. Credenciais invalidas respondem `401` (a mesma resposta para senha errada e e-mail desconhecido) e usuario desativado responde `403`. Sem token, ou com token invalido, expirado ou sem perfil valido, a API responde `401`; com um perfil sem permissao, `403`.
+
+Para criar o primeiro administrador, suba a aplicacao uma vez com `LV_ADMIN_EMAIL` e `LV_ADMIN_PASSWORD` definidos. Depois disso as duas variaveis podem ser removidas.
 
 | Papel | Permissoes |
 |---|---|
-| OPERATOR | Cria e consulta rotas |
-| AUDITOR | Consulta rotas e verifica integridade |
-| ADMIN | Acesso total, incluindo gestao de usuarios |
+| OPERATOR | Le veiculos, pontos e rotas; cadastra pontos de entrega e calcula rotas |
+| AUDITOR | Le veiculos, pontos e rotas; verifica integridade (`GET /api/routes/{id}/integrity`) |
+| ADMIN | Acesso total, incluindo cadastro e status de veiculos, usuarios e configuracoes |
 
 ## Modulos do projeto
 
