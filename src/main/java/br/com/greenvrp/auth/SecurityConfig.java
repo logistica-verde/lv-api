@@ -57,7 +57,7 @@ public class SecurityConfig {
 				.requestMatchers(HttpMethod.POST, "/api/vehicles/**").hasRole("ADMIN")
 				.requestMatchers(HttpMethod.PATCH, "/api/vehicles/**").hasRole("ADMIN")
 				.requestMatchers(HttpMethod.GET, "/api/routes/*/integrity").hasAnyRole("AUDITOR", "ADMIN")
-				.requestMatchers(HttpMethod.POST, "/api/routes", "/api/delivery-points")
+				.requestMatchers(HttpMethod.POST, "/api/routes/calculate", "/api/delivery-points")
 					.hasAnyRole("OPERATOR", "ADMIN")
 				.requestMatchers("/api/**").authenticated()
 				.anyRequest().denyAll())

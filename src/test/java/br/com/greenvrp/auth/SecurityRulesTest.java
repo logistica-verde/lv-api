@@ -192,10 +192,28 @@ class SecurityRulesTest {
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("{\"nome\":\"Centro\",\"latitude\":-23.5,\"longitude\":-46.6}"))
 			.andExpect(status().isForbidden());
-		mockMvc.perform(post("/api/routes").header(HttpHeaders.AUTHORIZATION, bearer(Role.AUDITOR))
+		mockMvc.perform(post("/api/routes/calculate").header(HttpHeaders.AUTHORIZATION, bearer(Role.AUDITOR))
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("{\"vehicleId\":1,\"deliveryPointIds\":[1,2],\"criterion\":\"EMISSION\"}"))
 			.andExpect(status().isForbidden());
+	}
+
+	@Test
+	void operatorsAndAdministratorsReachTheRouteCalculation() throws Exception {
+		for (Role role : new Role[] {Role.OPERATOR, Role.ADMIN}) {
+			mockMvc.perform(post("/api/routes/calculate").header(HttpHeaders.AUTHORIZATION, bearer(role))
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("{\"vehicleId\":999999,\"deliveryPointIds\":[1,2],\"criterion\":\"EMISSION\"}"))
+				.andExpect(status().isNotFound());
+		}
+	}
+
+	@Test
+	void routeCalculationRequiresAToken() throws Exception {
+		mockMvc.perform(post("/api/routes/calculate")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"vehicleId\":1,\"deliveryPointIds\":[1,2],\"criterion\":\"EMISSION\"}"))
+			.andExpect(status().isUnauthorized());
 	}
 
 	@Test
