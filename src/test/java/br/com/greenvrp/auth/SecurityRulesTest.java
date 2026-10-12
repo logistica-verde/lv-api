@@ -5,6 +5,7 @@ import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -229,6 +230,25 @@ class SecurityRulesTest {
 			.andExpect(jsonPath("$.ativo").value(false));
 		mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
 				.content("{\"email\":\"" + operator.getEmail() + "\",\"senha\":\"" + PASSWORD + "\"}"))
+			.andExpect(status().isForbidden());
+	}
+
+	@Test
+	void administratorsReadAndSaveTheGeneticAlgorithmParameters() throws Exception {
+		getAs(Role.ADMIN, "/api/settings/ga")
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.populationSize").isNumber());
+
+		mockMvc.perform(put("/api/settings/ga").header(HttpHeaders.AUTHORIZATION, bearer(Role.ADMIN))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"populationSize\":120,\"generations\":240,\"crossoverRate\":0.7,\"mutationRate\":0.03}"))
+			.andExpect(status().isOk());
+		getAs(Role.ADMIN, "/api/settings/ga")
+			.andExpect(jsonPath("$.populationSize").value(120))
+			.andExpect(jsonPath("$.mutationRate").value(0.03));
+		mockMvc.perform(put("/api/settings/ga").header(HttpHeaders.AUTHORIZATION, bearer(Role.OPERATOR))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"populationSize\":120,\"generations\":240,\"crossoverRate\":0.7,\"mutationRate\":0.03}"))
 			.andExpect(status().isForbidden());
 	}
 

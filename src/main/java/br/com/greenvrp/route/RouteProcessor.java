@@ -8,6 +8,8 @@ import br.com.greenvrp.optimizer.InvalidOptimizerResponseException;
 import br.com.greenvrp.optimizer.OptimizeRequest;
 import br.com.greenvrp.optimizer.OptimizeResponse;
 import br.com.greenvrp.optimizer.OptimizerClient;
+import br.com.greenvrp.settings.GaSettingsService;
+import br.com.greenvrp.settings.GaSettingsValues;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -46,6 +48,7 @@ public class RouteProcessor {
 	private final GeoQueryService geoQueryService;
 	private final OptimizerClient optimizerClient;
 	private final BlockchainService blockchainService;
+	private final GaSettingsService gaSettingsService;
 	private final TransactionTemplate transactions;
 	private final Executor executor;
 
@@ -54,12 +57,14 @@ public class RouteProcessor {
 		GeoQueryService geoQueryService,
 		OptimizerClient optimizerClient,
 		BlockchainService blockchainService,
+		GaSettingsService gaSettingsService,
 		PlatformTransactionManager transactionManager,
 		@Qualifier("routeExecutor") Executor executor) {
 		this.operationRepository = operationRepository;
 		this.geoQueryService = geoQueryService;
 		this.optimizerClient = optimizerClient;
 		this.blockchainService = blockchainService;
+		this.gaSettingsService = gaSettingsService;
 		this.transactions = new TransactionTemplate(transactionManager);
 		this.executor = executor;
 	}
@@ -85,8 +90,11 @@ public class RouteProcessor {
 			Operation operation = loadOperation(operationId);
 			List<DeliveryPoint> points = pointsOf(operation);
 			List<PairSegment> pairs = geoQueryService.buildPairSegments(points);
+			GaSettingsValues settings = gaSettingsService.current();
+			OptimizeRequest.GaParams gaParams = new OptimizeRequest.GaParams(
+				settings.populationSize(), settings.generations(), settings.crossoverRate(), settings.mutationRate());
 			OptimizeRequest request = OptimizeRequest.of(
-				operation.getCriterio(), operation.getVehicle().getMassaKg(), points.size(), pairs);
+				operation.getCriterio(), operation.getVehicle().getMassaKg(), points.size(), pairs, gaParams);
 			return new Prepared(request, pairs);
 		});
 	}

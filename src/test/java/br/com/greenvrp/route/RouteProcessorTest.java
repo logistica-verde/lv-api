@@ -16,10 +16,13 @@ import br.com.greenvrp.geo.GeoQueryService;
 import br.com.greenvrp.geo.PairSegment;
 import br.com.greenvrp.geo.RoadDataNotFoundException;
 import br.com.greenvrp.optimizer.OptimizationCriterion;
+import br.com.greenvrp.optimizer.OptimizeRequest;
 import br.com.greenvrp.optimizer.OptimizeResponse;
 import br.com.greenvrp.optimizer.OptimizeResponse.SegmentEmission;
 import br.com.greenvrp.optimizer.OptimizerClient;
 import br.com.greenvrp.optimizer.OptimizerException;
+import br.com.greenvrp.settings.GaSettingsService;
+import br.com.greenvrp.settings.GaSettingsValues;
 import br.com.greenvrp.vehicle.Vehicle;
 import br.com.greenvrp.vehicle.VehicleRepository;
 import java.util.ArrayList;
@@ -28,6 +31,7 @@ import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -54,6 +58,7 @@ class RouteProcessorTest {
 	private final GeoQueryService geoQueryService = mock(GeoQueryService.class);
 	private final OptimizerClient optimizerClient = mock(OptimizerClient.class);
 	private final BlockchainService blockchainService = mock(BlockchainService.class);
+	private final GaSettingsService gaSettingsService = mock(GaSettingsService.class);
 
 	private RouteProcessor processor;
 	private Long operationId;
@@ -61,8 +66,10 @@ class RouteProcessorTest {
 
 	@BeforeEach
 	void setUp() {
+		when(gaSettingsService.current()).thenReturn(GaSettingsValues.DEFAULT);
 		processor = new RouteProcessor(
-			operationRepository, geoQueryService, optimizerClient, blockchainService, transactionManager, Runnable::run);
+			operationRepository, geoQueryService, optimizerClient, blockchainService, gaSettingsService,
+			transactionManager, Runnable::run);
 
 		Vehicle vehicle = vehicleRepository.save(new Vehicle("ABC1D23", 7500.0, "diesel"));
 		List<DeliveryPoint> points = List.of(
@@ -129,6 +136,32 @@ class RouteProcessorTest {
 					tuple(pointIds.get(0), pointIds.get(2), 3.5, 1002.0));
 			return null;
 		});
+	}
+
+	@Test
+	void sendsTheConfiguredGeneticAlgorithmParametersToTheOptimizer() {
+		when(gaSettingsService.current()).thenReturn(new GaSettingsValues(250, 400, 0.9, 0.1));
+		when(optimizerClient.optimize(any())).thenReturn(CompletableFuture.failedFuture(
+			new OptimizerException("Optimizer call failed: stop here", new RuntimeException())));
+
+		processor.processAsync(operationId).join();
+
+		ArgumentCaptor<OptimizeRequest> sent = ArgumentCaptor.forClass(OptimizeRequest.class);
+		verify(optimizerClient).optimize(sent.capture());
+		assertThat(sent.getValue().gaParams())
+			.isEqualTo(new OptimizeRequest.GaParams(250, 400, 0.9, 0.1));
+	}
+
+	@Test
+	void sendsTheDefaultParametersWhenNothingWasConfigured() {
+		when(optimizerClient.optimize(any())).thenReturn(CompletableFuture.failedFuture(
+			new OptimizerException("Optimizer call failed: stop here", new RuntimeException())));
+
+		processor.processAsync(operationId).join();
+
+		ArgumentCaptor<OptimizeRequest> sent = ArgumentCaptor.forClass(OptimizeRequest.class);
+		verify(optimizerClient).optimize(sent.capture());
+		assertThat(sent.getValue().gaParams()).isEqualTo(new OptimizeRequest.GaParams(100, 200, 0.8, 0.05));
 	}
 
 	@Test
