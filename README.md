@@ -40,6 +40,7 @@ A aplicacao le variaveis de ambiente (ou, alternativamente, as propriedades equi
 | `BESU_CHAIN_ID` | `1337` | Chain ID da rede Besu |
 | `BESU_CONTRACT_ADDRESS` | vazio | Endereco do contrato `AuditRegistry` ja implantado |
 | `BESU_PRIVATE_KEY` | vazio | Chave privada da conta que assina as transacoes de ancoragem |
+| `LV_CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | Origens do front autorizadas a chamar a API, separadas por virgula |
 | `JWT_SECRET` | sem padrao (obrigatoria) | Segredo HS256 dos tokens, com pelo menos 32 caracteres. A aplicacao nao sobe sem ele |
 | `JWT_EXPIRATION` | `8h` | Validade do token (formato de duracao, por exemplo `30m`) |
 | `LV_ADMIN_EMAIL` / `LV_ADMIN_PASSWORD` | vazio | Se a tabela de usuarios estiver vazia, cria o primeiro administrador com esses dados |
