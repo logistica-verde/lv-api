@@ -57,13 +57,7 @@ public class GeocodeService {
 	}
 
 	public List<GeocodeMatch> search(String rawQuery) {
-		String query = normalize(rawQuery);
-		if (query.length() < MIN_QUERY_LENGTH) {
-			throw new InvalidRequestException("q must have at least %d characters".formatted(MIN_QUERY_LENGTH));
-		}
-		if (query.length() > MAX_QUERY_LENGTH) {
-			throw new InvalidRequestException("q must have at most %d characters".formatted(MAX_QUERY_LENGTH));
-		}
+		String query = validQuery(rawQuery);
 		String key = query.toLowerCase(Locale.ROOT);
 
 		List<GeocodeMatch> cached = fromCache(key);
@@ -90,8 +84,15 @@ public class GeocodeService {
 		}
 	}
 
-	private static String normalize(String rawQuery) {
-		return rawQuery == null ? "" : rawQuery.trim().replaceAll("\\s+", " ");
+	private static String validQuery(String rawQuery) {
+		String query = rawQuery == null ? "" : rawQuery.trim().replaceAll("\\s+", " ");
+		if (query.length() < MIN_QUERY_LENGTH) {
+			throw new InvalidRequestException("q must have at least %d characters".formatted(MIN_QUERY_LENGTH));
+		}
+		if (query.length() > MAX_QUERY_LENGTH) {
+			throw new InvalidRequestException("q must have at most %d characters".formatted(MAX_QUERY_LENGTH));
+		}
+		return query;
 	}
 
 	private List<GeocodeMatch> fromCache(String key) {
