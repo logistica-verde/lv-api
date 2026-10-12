@@ -6,14 +6,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import br.com.greenvrp.api.ResourceNotFoundException;
+import br.com.greenvrp.auth.SecurityConfig;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(IntegrityController.class)
+@Import(SecurityConfig.class)
+@WithMockUser(roles = "ADMIN")
 class IntegrityControllerTest {
 
 	@Autowired
