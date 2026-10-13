@@ -4,6 +4,7 @@ import br.com.greenvrp.api.InvalidRequestException;
 import br.com.greenvrp.api.ResourceNotFoundException;
 import br.com.greenvrp.route.OperationStatus;
 import java.util.HashSet;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,18 +20,20 @@ public class ExperimentService {
 	}
 
 	public ExperimentAcceptedResponse start(ExperimentRequest request) {
-		if (new HashSet<>(request.instances()).size() != request.instances().size()) {
-			throw new InvalidRequestException("instances must not contain duplicates");
-		}
-		if (new HashSet<>(request.seeds()).size() != request.seeds().size()) {
-			throw new InvalidRequestException("seeds must not contain duplicates");
-		}
+		rejectDuplicates("instances", request.instances());
+		rejectDuplicates("seeds", request.seeds());
 		if (repository.existsByStatus(OperationStatus.PENDING)) {
 			throw new ExperimentAlreadyRunningException();
 		}
 		Experiment saved = repository.save(Experiment.pending(request.instances(), request.seeds()));
 		runner.runAsync(saved.getId());
 		return new ExperimentAcceptedResponse(saved.getId(), saved.getStatus());
+	}
+
+	private void rejectDuplicates(String field, List<Integer> values) {
+		if (new HashSet<>(values).size() != values.size()) {
+			throw new InvalidRequestException(field + " must not contain duplicates");
+		}
 	}
 
 	@Transactional(readOnly = true)

@@ -33,21 +33,35 @@ public class OperationHistoryController {
 		@RequestParam(defaultValue = "desc") String direction,
 		@RequestParam(defaultValue = "1") int page,
 		@RequestParam(defaultValue = "10") int size) {
+		checkPeriod(from, to);
+		checkPaging(page, size);
+		boolean ascending = parseDirection(direction);
+		HistoryQuery query = new HistoryQuery(
+			from, to, vehicleId, criterion, integrity, HistorySort.fromKey(sort), ascending, page, size);
+		return service.list(query);
+	}
+
+	private void checkPeriod(LocalDate from, LocalDate to) {
 		if (from != null && to != null && from.isAfter(to)) {
 			throw new InvalidRequestException("from must not be after to");
 		}
+	}
+
+	private void checkPaging(int page, int size) {
 		if (page < 1) {
 			throw new InvalidRequestException("page must be at least 1");
 		}
 		if (size < 1 || size > MAX_PAGE_SIZE) {
 			throw new InvalidRequestException("size must be between 1 and " + MAX_PAGE_SIZE);
 		}
-		if (!direction.equals("asc") && !direction.equals("desc")) {
-			throw new InvalidRequestException("direction must be asc or desc");
-		}
-		HistoryQuery query = new HistoryQuery(
-			from, to, vehicleId, criterion, integrity, HistorySort.fromKey(sort), direction.equals("asc"), page, size);
-		return service.list(query);
+	}
+
+	private boolean parseDirection(String direction) {
+		return switch (direction) {
+			case "asc" -> true;
+			case "desc" -> false;
+			default -> throw new InvalidRequestException("direction must be asc or desc");
+		};
 	}
 
 }

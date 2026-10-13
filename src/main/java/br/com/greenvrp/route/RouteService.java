@@ -34,15 +34,12 @@ public class RouteService {
 	}
 
 	public RouteAcceptedResponse calculate(RouteRequest request) {
-		if (new HashSet<>(request.deliveryPointIds()).size() != request.deliveryPointIds().size()) {
+		List<Long> pointIds = request.deliveryPointIds();
+		if (new HashSet<>(pointIds).size() != pointIds.size()) {
 			throw new InvalidRequestException("deliveryPointIds must not contain duplicates");
 		}
-		Vehicle vehicle = vehicleRepository.findById(request.vehicleId())
-			.orElseThrow(() -> new ResourceNotFoundException("Vehicle %d not found".formatted(request.vehicleId())));
-		if (!vehicle.isAtivo()) {
-			throw new InvalidRequestException("Vehicle %d is inactive".formatted(vehicle.getId()));
-		}
-		List<DeliveryPoint> points = request.deliveryPointIds().stream().map(this::activePoint).toList();
+		Vehicle vehicle = activeVehicle(request.vehicleId());
+		List<DeliveryPoint> points = pointIds.stream().map(this::activePoint).toList();
 
 		Operation operation = operationRepository.save(Operation.pending(vehicle, request.criterion(), points));
 		routeProcessor.processAsync(operation.getId());
@@ -51,21 +48,15 @@ public class RouteService {
 
 	@Transactional(readOnly = true)
 	public RouteResponse get(Long id) {
-		Operation operation = operationRepository.findById(id)
-			.orElseThrow(() -> new ResourceNotFoundException("Route operation %d not found".formatted(id)));
-		return RouteResponse.from(operation);
+		return RouteResponse.from(find(id));
 	}
 
 	@Transactional(readOnly = true)
 	public RouteComparisonResponse compare(Long emissionId, Long distanceId) {
 		Operation emission = find(emissionId);
 		Operation distance = find(distanceId);
-		if (emission.getCriterio() != OptimizationCriterion.EMISSION) {
-			throw new InvalidRequestException("Operation %d is not an emission route".formatted(emissionId));
-		}
-		if (distance.getCriterio() != OptimizationCriterion.DISTANCE) {
-			throw new InvalidRequestException("Operation %d is not a distance route".formatted(distanceId));
-		}
+		requireCriterion(emission, OptimizationCriterion.EMISSION, "an emission");
+		requireCriterion(distance, OptimizationCriterion.DISTANCE, "a distance");
 		if (!emission.getVehicle().getId().equals(distance.getVehicle().getId())) {
 			throw new InvalidRequestException("The routes were calculated for different vehicles");
 		}
@@ -80,10 +71,26 @@ public class RouteService {
 			.orElseThrow(() -> new ResourceNotFoundException("Route operation %d not found".formatted(id)));
 	}
 
+	private void requireCriterion(Operation operation, OptimizationCriterion expected, String description) {
+		if (operation.getCriterio() != expected) {
+			throw new InvalidRequestException(
+				"Operation %d is not %s route".formatted(operation.getId(), description));
+		}
+	}
+
 	private Set<Long> pointIdsOf(Operation operation) {
 		return operation.getPoints().stream()
 			.map(item -> item.getPoint().getId())
 			.collect(Collectors.toSet());
+	}
+
+	private Vehicle activeVehicle(Long id) {
+		Vehicle vehicle = vehicleRepository.findById(id)
+			.orElseThrow(() -> new ResourceNotFoundException("Vehicle %d not found".formatted(id)));
+		if (!vehicle.isAtivo()) {
+			throw new InvalidRequestException("Vehicle %d is inactive".formatted(id));
+		}
+		return vehicle;
 	}
 
 	private DeliveryPoint activePoint(Long id) {

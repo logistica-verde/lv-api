@@ -35,7 +35,9 @@ import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import tools.jackson.databind.ObjectMapper;
 
 @Configuration
@@ -46,6 +48,11 @@ public class SecurityConfig {
 
 	@Bean
 	public SecurityFilterChain securityFilterChain(HttpSecurity http, ObjectMapper objectMapper) throws Exception {
+		AuthenticationEntryPoint unauthorized = (request, response, exception) ->
+			writeProblem(objectMapper, response, HttpStatus.UNAUTHORIZED, "Authentication is required.");
+		AccessDeniedHandler forbidden = (request, response, exception) ->
+			writeProblem(objectMapper, response, HttpStatus.FORBIDDEN, "Access denied for this profile.");
+
 		http
 			.csrf(AbstractHttpConfigurer::disable)
 			.cors(Customizer.withDefaults())
@@ -63,15 +70,11 @@ public class SecurityConfig {
 				.anyRequest().denyAll())
 			.oauth2ResourceServer(resource -> resource
 				.jwt(jwt -> jwt.jwtAuthenticationConverter(authenticationConverter()))
-				.authenticationEntryPoint((request, response, exception) ->
-					writeProblem(objectMapper, response, HttpStatus.UNAUTHORIZED, "Authentication is required."))
-				.accessDeniedHandler((request, response, exception) ->
-					writeProblem(objectMapper, response, HttpStatus.FORBIDDEN, "Access denied for this profile.")))
+				.authenticationEntryPoint(unauthorized)
+				.accessDeniedHandler(forbidden))
 			.exceptionHandling(handling -> handling
-				.authenticationEntryPoint((request, response, exception) ->
-					writeProblem(objectMapper, response, HttpStatus.UNAUTHORIZED, "Authentication is required."))
-				.accessDeniedHandler((request, response, exception) ->
-					writeProblem(objectMapper, response, HttpStatus.FORBIDDEN, "Access denied for this profile.")));
+				.authenticationEntryPoint(unauthorized)
+				.accessDeniedHandler(forbidden));
 		return http.build();
 	}
 

@@ -114,35 +114,48 @@ public class RouteProcessor {
 			List<Integer> sequence = response.sequence();
 			validateSequence(sequence, points.size());
 
-			Map<Leg, PairSegment> pairs = new HashMap<>();
-			prepared.pairs().forEach(pair -> pairs.put(new Leg(pair.fromIndex(), pair.toIndex()), pair));
-			Map<Leg, Double> emissions = new HashMap<>();
-			if (response.segmentEmissions() != null) {
-				response.segmentEmissions().forEach(
-					emission -> emissions.put(new Leg(emission.fromIndex(), emission.toIndex()), emission.emissionKg()));
-			}
-
-			List<RouteSegment> legs = IntStream.range(0, sequence.size() - 1)
-				.mapToObj(position -> {
-					Leg leg = new Leg(sequence.get(position), sequence.get(position + 1));
-					PairSegment pair = pairs.get(leg);
-					Double emission = emissions.get(leg);
-					if (emission == null) {
-						throw new InvalidOptimizerResponseException(
-							"Optimizer response has no emission for leg %d -> %d".formatted(leg.from(), leg.to()));
-					}
-					DeliveryPoint origin = points.get(leg.from());
-					DeliveryPoint destination = points.get(leg.to());
-					return new RouteSegment(
-						operation, origin, destination, position + 1,
-						lineBetween(origin, destination),
-						pair.averageSpeedKmh(), pair.slopePercent(), emission, pair.distanceMeters());
-				})
-				.toList();
-
+			List<RouteSegment> legs = buildLegs(
+				operation, points, sequence, pairsByLeg(prepared.pairs()), emissionsByLeg(response));
 			operation.complete(response.totalEmissionKg(), sequence, legs);
 			operation.registrarTempoExecucao(executionMillis);
 		});
+	}
+
+	private Map<Leg, PairSegment> pairsByLeg(List<PairSegment> pairs) {
+		Map<Leg, PairSegment> byLeg = new HashMap<>();
+		pairs.forEach(pair -> byLeg.put(new Leg(pair.fromIndex(), pair.toIndex()), pair));
+		return byLeg;
+	}
+
+	private Map<Leg, Double> emissionsByLeg(OptimizeResponse response) {
+		Map<Leg, Double> byLeg = new HashMap<>();
+		if (response.segmentEmissions() != null) {
+			response.segmentEmissions().forEach(
+				emission -> byLeg.put(new Leg(emission.fromIndex(), emission.toIndex()), emission.emissionKg()));
+		}
+		return byLeg;
+	}
+
+	private List<RouteSegment> buildLegs(
+		Operation operation, List<DeliveryPoint> points, List<Integer> sequence,
+		Map<Leg, PairSegment> pairs, Map<Leg, Double> emissions) {
+		return IntStream.range(0, sequence.size() - 1)
+			.mapToObj(position -> {
+				Leg leg = new Leg(sequence.get(position), sequence.get(position + 1));
+				Double emission = emissions.get(leg);
+				if (emission == null) {
+					throw new InvalidOptimizerResponseException(
+						"Optimizer response has no emission for leg %d -> %d".formatted(leg.from(), leg.to()));
+				}
+				PairSegment pair = pairs.get(leg);
+				DeliveryPoint origin = points.get(leg.from());
+				DeliveryPoint destination = points.get(leg.to());
+				return new RouteSegment(
+					operation, origin, destination, position + 1,
+					lineBetween(origin, destination),
+					pair.averageSpeedKmh(), pair.slopePercent(), emission, pair.distanceMeters());
+			})
+			.toList();
 	}
 
 	private void validateSequence(List<Integer> sequence, int pointCount) {
