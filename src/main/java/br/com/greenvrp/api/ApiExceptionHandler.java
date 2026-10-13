@@ -5,6 +5,7 @@ import br.com.greenvrp.auth.InvalidCredentialsException;
 import br.com.greenvrp.auth.LastAdministratorException;
 import br.com.greenvrp.blockchain.LedgerException;
 import br.com.greenvrp.experiment.ExperimentAlreadyRunningException;
+import br.com.greenvrp.geocode.GeocoderUnavailableException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -36,6 +37,11 @@ public class ApiExceptionHandler {
 	@ExceptionHandler(InactiveUserException.class)
 	public ProblemDetail handleInactiveUser(InactiveUserException exception) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, exception.getMessage());
+	}
+
+	@ExceptionHandler(GeocoderUnavailableException.class)
+	public ProblemDetail handleGeocoderUnavailable(GeocoderUnavailableException exception) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage());
 	}
 
 	@ExceptionHandler(ExperimentAlreadyRunningException.class)

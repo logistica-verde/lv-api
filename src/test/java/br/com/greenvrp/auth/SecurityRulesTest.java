@@ -280,6 +280,14 @@ class SecurityRulesTest {
 	}
 
 	@Test
+	void addressSearchNeedsALoginButNotASpecificProfile() throws Exception {
+		mockMvc.perform(get("/api/geocode").param("q", "Praça da Sé")).andExpect(status().isUnauthorized());
+		for (Role role : Role.values()) {
+			getAs(role, "/api/geocode?q=ab").andExpect(status().isBadRequest());
+		}
+	}
+
+	@Test
 	void keepsUserAndSettingsAdministrationToAdministrators() throws Exception {
 		for (String path : new String[] {"/api/users", "/api/settings/ga"}) {
 			getAs(Role.OPERATOR, path).andExpect(status().isForbidden());
