@@ -31,3 +31,7 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### deploy ###
+deploy/.env
+deploy/data/

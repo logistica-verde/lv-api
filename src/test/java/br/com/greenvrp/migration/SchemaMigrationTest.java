@@ -44,6 +44,27 @@ class SchemaMigrationTest {
 	}
 
 	@Test
+	void seedsTheDefaultGeneticAlgorithmParameters() {
+		JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+
+		var row = jdbc.queryForMap("SELECT populacao, geracoes, taxa_cruzamento, taxa_mutacao FROM parametros_ag");
+
+		assertThat(row.get("populacao")).isEqualTo(100);
+		assertThat(row.get("geracoes")).isEqualTo(200);
+		assertThat(((Number) row.get("taxa_cruzamento")).doubleValue()).isEqualTo(0.8);
+		assertThat(((Number) row.get("taxa_mutacao")).doubleValue()).isEqualTo(0.05);
+	}
+
+	@Test
+	void refusesParametersOutsideTheAllowedRangesAtTheDatabaseToo() {
+		JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+
+		org.assertj.core.api.Assertions.assertThatThrownBy(
+			() -> jdbc.update("UPDATE parametros_ag SET taxa_mutacao = 2 WHERE id = 1"))
+			.isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+	}
+
+	@Test
 	void startsFromVersionOne() {
 		assertThat(flyway.info().all()[0].getVersion()).isEqualTo(MigrationVersion.fromVersion("1"));
 	}

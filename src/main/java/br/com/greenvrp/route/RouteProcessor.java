@@ -2,12 +2,14 @@ package br.com.greenvrp.route;
 
 import br.com.greenvrp.blockchain.BlockchainService;
 import br.com.greenvrp.deliverypoint.DeliveryPoint;
-import br.com.greenvrp.geo.GeoQueryService;
+import br.com.greenvrp.geo.PairSegmentSource;
 import br.com.greenvrp.geo.PairSegment;
 import br.com.greenvrp.optimizer.InvalidOptimizerResponseException;
 import br.com.greenvrp.optimizer.OptimizeRequest;
 import br.com.greenvrp.optimizer.OptimizeResponse;
 import br.com.greenvrp.optimizer.OptimizerClient;
+import br.com.greenvrp.settings.GaSettingsService;
+import br.com.greenvrp.settings.GaSettingsValues;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -17,6 +19,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
@@ -43,31 +46,37 @@ public class RouteProcessor {
 	}
 
 	private final OperationRepository operationRepository;
-	private final GeoQueryService geoQueryService;
+	private final PairSegmentSource pairSegmentSource;
 	private final OptimizerClient optimizerClient;
 	private final BlockchainService blockchainService;
+	private final GaSettingsService gaSettingsService;
 	private final TransactionTemplate transactions;
 	private final Executor executor;
 
 	public RouteProcessor(
 		OperationRepository operationRepository,
-		GeoQueryService geoQueryService,
+		PairSegmentSource pairSegmentSource,
 		OptimizerClient optimizerClient,
 		BlockchainService blockchainService,
+		GaSettingsService gaSettingsService,
 		PlatformTransactionManager transactionManager,
 		@Qualifier("routeExecutor") Executor executor) {
 		this.operationRepository = operationRepository;
-		this.geoQueryService = geoQueryService;
+		this.pairSegmentSource = pairSegmentSource;
 		this.optimizerClient = optimizerClient;
 		this.blockchainService = blockchainService;
+		this.gaSettingsService = gaSettingsService;
 		this.transactions = new TransactionTemplate(transactionManager);
 		this.executor = executor;
 	}
 
 	public CompletableFuture<Void> processAsync(Long operationId) {
 		return CompletableFuture.supplyAsync(() -> prepare(operationId), executor)
-			.thenCompose(prepared -> optimizerClient.optimize(prepared.request())
-				.thenAcceptAsync(response -> complete(operationId, prepared, response), executor))
+			.thenCompose(prepared -> {
+				long startedAt = System.nanoTime();
+				return optimizerClient.optimize(prepared.request())
+					.thenAcceptAsync(response -> complete(operationId, prepared, response, elapsedMillis(startedAt)), executor);
+			})
 			.thenApply(done -> true)
 			.exceptionally(error -> {
 				markFailed(operationId, error);
@@ -84,48 +93,69 @@ public class RouteProcessor {
 		return transactions.execute(status -> {
 			Operation operation = loadOperation(operationId);
 			List<DeliveryPoint> points = pointsOf(operation);
-			List<PairSegment> pairs = geoQueryService.buildPairSegments(points);
+			List<PairSegment> pairs = pairSegmentSource.buildPairSegments(points);
+			GaSettingsValues settings = gaSettingsService.current();
+			OptimizeRequest.GaParams gaParams = new OptimizeRequest.GaParams(
+				settings.populationSize(), settings.generations(), settings.crossoverRate(), settings.mutationRate());
 			OptimizeRequest request = OptimizeRequest.of(
-				operation.getCriterio(), operation.getVehicle().getMassaKg(), points.size(), pairs);
+				operation.getCriterio(), operation.getVehicle().getMassaKg(), points.size(), pairs, gaParams);
 			return new Prepared(request, pairs);
 		});
 	}
 
-	private void complete(Long operationId, Prepared prepared, OptimizeResponse response) {
+	private static long elapsedMillis(long startedAtNanos) {
+		return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAtNanos);
+	}
+
+	private void complete(Long operationId, Prepared prepared, OptimizeResponse response, long executionMillis) {
 		transactions.executeWithoutResult(status -> {
 			Operation operation = loadOperation(operationId);
 			List<DeliveryPoint> points = pointsOf(operation);
 			List<Integer> sequence = response.sequence();
 			validateSequence(sequence, points.size());
 
-			Map<Leg, PairSegment> pairs = new HashMap<>();
-			prepared.pairs().forEach(pair -> pairs.put(new Leg(pair.fromIndex(), pair.toIndex()), pair));
-			Map<Leg, Double> emissions = new HashMap<>();
-			if (response.segmentEmissions() != null) {
-				response.segmentEmissions().forEach(
-					emission -> emissions.put(new Leg(emission.fromIndex(), emission.toIndex()), emission.emissionKg()));
-			}
-
-			List<RouteSegment> legs = IntStream.range(0, sequence.size() - 1)
-				.mapToObj(position -> {
-					Leg leg = new Leg(sequence.get(position), sequence.get(position + 1));
-					PairSegment pair = pairs.get(leg);
-					Double emission = emissions.get(leg);
-					if (emission == null) {
-						throw new InvalidOptimizerResponseException(
-							"Optimizer response has no emission for leg %d -> %d".formatted(leg.from(), leg.to()));
-					}
-					DeliveryPoint origin = points.get(leg.from());
-					DeliveryPoint destination = points.get(leg.to());
-					return new RouteSegment(
-						operation, origin, destination, position + 1,
-						lineBetween(origin, destination),
-						pair.averageSpeedKmh(), pair.slopePercent(), emission, pair.distanceMeters());
-				})
-				.toList();
-
+			List<RouteSegment> legs = buildLegs(
+				operation, points, sequence, pairsByLeg(prepared.pairs()), emissionsByLeg(response));
 			operation.complete(response.totalEmissionKg(), sequence, legs);
+			operation.registrarTempoExecucao(executionMillis);
 		});
+	}
+
+	private Map<Leg, PairSegment> pairsByLeg(List<PairSegment> pairs) {
+		Map<Leg, PairSegment> byLeg = new HashMap<>();
+		pairs.forEach(pair -> byLeg.put(new Leg(pair.fromIndex(), pair.toIndex()), pair));
+		return byLeg;
+	}
+
+	private Map<Leg, Double> emissionsByLeg(OptimizeResponse response) {
+		Map<Leg, Double> byLeg = new HashMap<>();
+		if (response.segmentEmissions() != null) {
+			response.segmentEmissions().forEach(
+				emission -> byLeg.put(new Leg(emission.fromIndex(), emission.toIndex()), emission.emissionKg()));
+		}
+		return byLeg;
+	}
+
+	private List<RouteSegment> buildLegs(
+		Operation operation, List<DeliveryPoint> points, List<Integer> sequence,
+		Map<Leg, PairSegment> pairs, Map<Leg, Double> emissions) {
+		return IntStream.range(0, sequence.size() - 1)
+			.mapToObj(position -> {
+				Leg leg = new Leg(sequence.get(position), sequence.get(position + 1));
+				Double emission = emissions.get(leg);
+				if (emission == null) {
+					throw new InvalidOptimizerResponseException(
+						"Optimizer response has no emission for leg %d -> %d".formatted(leg.from(), leg.to()));
+				}
+				PairSegment pair = pairs.get(leg);
+				DeliveryPoint origin = points.get(leg.from());
+				DeliveryPoint destination = points.get(leg.to());
+				return new RouteSegment(
+					operation, origin, destination, position + 1,
+					lineBetween(origin, destination),
+					pair.averageSpeedKmh(), pair.slopePercent(), emission, pair.distanceMeters());
+			})
+			.toList();
 	}
 
 	private void validateSequence(List<Integer> sequence, int pointCount) {

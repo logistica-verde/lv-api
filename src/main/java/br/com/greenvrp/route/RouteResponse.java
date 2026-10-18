@@ -14,6 +14,7 @@ public record RouteResponse(
 	Instant createdAt,
 	Double totalEmissionKg,
 	Double totalDistanceMeters,
+	Long executionMs,
 	String errorMessage,
 	List<PointItem> points,
 	List<SegmentItem> segments
@@ -69,6 +70,7 @@ public record RouteResponse(
 			operation.getDataHora(),
 			operation.getEmissaoTotalKg(),
 			totalDistance,
+			operation.getTempoExecucaoMs(),
 			operation.getMensagemErro(),
 			points,
 			segments);

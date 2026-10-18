@@ -3,10 +3,12 @@ package br.com.greenvrp.geo;
 import br.com.greenvrp.deliverypoint.DeliveryPoint;
 import java.util.ArrayList;
 import java.util.List;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 @Service
-public class GeoQueryService {
+@ConditionalOnProperty(prefix = "lv.geo", name = "provider", havingValue = "database", matchIfMissing = true)
+public class GeoQueryService implements PairSegmentSource {
 
 	private final SpatialRepository spatialRepository;
 
@@ -14,6 +16,7 @@ public class GeoQueryService {
 		this.spatialRepository = spatialRepository;
 	}
 
+	@Override
 	public List<PairSegment> buildPairSegments(List<DeliveryPoint> points) {
 		List<RoadSegment> nearest = points.stream().map(this::nearestRoadSegment).toList();
 

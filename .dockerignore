@@ -1,0 +1,8 @@
+target
+.git
+.idea
+.vscode
+deploy
+docs
+HELP.md
+*.iml

@@ -10,17 +10,22 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import br.com.greenvrp.api.InvalidRequestException;
 import br.com.greenvrp.api.ResourceNotFoundException;
+import br.com.greenvrp.auth.SecurityConfig;
 import br.com.greenvrp.optimizer.OptimizationCriterion;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(RouteController.class)
+@Import(SecurityConfig.class)
+@WithMockUser(roles = "ADMIN")
 class RouteControllerTest {
 
 	@Autowired
@@ -110,7 +115,7 @@ class RouteControllerTest {
 	void getReturnsRouteDetails() throws Exception {
 		RouteResponse response = new RouteResponse(
 			7L, 1L, OptimizationCriterion.EMISSION, OperationStatus.COMPLETED, Instant.parse("2026-10-05T12:00:00Z"),
-			5.5, 2010.0, null,
+			5.5, 2010.0, 842L, null,
 			List.of(new RouteResponse.PointItem(10L, "P1", -23.55, -46.63, 1)),
 			List.of(new RouteResponse.SegmentItem(10L, 11L, 1010.0, 40.0, 2.0, 2.0)));
 		given(routeService.get(7L)).willReturn(response);
@@ -119,8 +124,68 @@ class RouteControllerTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.status").value("COMPLETED"))
 			.andExpect(jsonPath("$.totalEmissionKg").value(5.5))
+			.andExpect(jsonPath("$.executionMs").value(842))
 			.andExpect(jsonPath("$.points[0].name").value("P1"))
 			.andExpect(jsonPath("$.segments[0].emissionKg").value(2.0));
+	}
+
+	private RouteResponse route(long id, OptimizationCriterion criterion, Long executionMs) {
+		return new RouteResponse(
+			id, 1L, criterion, OperationStatus.COMPLETED, Instant.parse("2026-10-05T12:00:00Z"),
+			5.5, 2010.0, executionMs, null,
+			List.of(new RouteResponse.PointItem(10L, "P1", -23.55, -46.63, 1)),
+			List.of());
+	}
+
+	@Test
+	void pendingRoutesHaveNoExecutionTimeYet() throws Exception {
+		RouteResponse pending = new RouteResponse(
+			8L, 1L, OptimizationCriterion.EMISSION, OperationStatus.PENDING, Instant.parse("2026-10-05T12:00:00Z"),
+			null, null, null, null, List.of(), List.of());
+		given(routeService.get(8L)).willReturn(pending);
+
+		mockMvc.perform(get("/api/routes/8"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.executionMs").doesNotExist());
+	}
+
+	@Test
+	void comparisonReturnsBothRoutesWithTheirExecutionTimes() throws Exception {
+		given(routeService.compare(7L, 8L)).willReturn(new RouteComparisonResponse(
+			route(7L, OptimizationCriterion.EMISSION, 842L), route(8L, OptimizationCriterion.DISTANCE, 615L)));
+
+		mockMvc.perform(get("/api/routes/comparison").param("emissionId", "7").param("distanceId", "8"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.emission.id").value(7))
+			.andExpect(jsonPath("$.emission.criterion").value("EMISSION"))
+			.andExpect(jsonPath("$.emission.executionMs").value(842))
+			.andExpect(jsonPath("$.distance.id").value(8))
+			.andExpect(jsonPath("$.distance.criterion").value("DISTANCE"))
+			.andExpect(jsonPath("$.distance.executionMs").value(615));
+	}
+
+	@Test
+	void comparisonOfUnrelatedRoutesIsABadRequest() throws Exception {
+		given(routeService.compare(7L, 9L))
+			.willThrow(new InvalidRequestException("The routes were calculated for different delivery points"));
+
+		mockMvc.perform(get("/api/routes/comparison").param("emissionId", "7").param("distanceId", "9"))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.detail").value("The routes were calculated for different delivery points"));
+	}
+
+	@Test
+	void comparisonOfAnUnknownRouteIsNotFound() throws Exception {
+		given(routeService.compare(7L, 99L)).willThrow(new ResourceNotFoundException("Route operation 99 not found"));
+
+		mockMvc.perform(get("/api/routes/comparison").param("emissionId", "7").param("distanceId", "99"))
+			.andExpect(status().isNotFound());
+	}
+
+	@Test
+	void comparisonNeedsBothIds() throws Exception {
+		mockMvc.perform(get("/api/routes/comparison").param("emissionId", "7"))
+			.andExpect(status().isBadRequest());
 	}
 
 	@Test

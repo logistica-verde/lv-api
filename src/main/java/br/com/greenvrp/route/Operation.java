@@ -52,6 +52,12 @@ public class Operation {
 	@Column(name = "mensagem_erro", length = 500)
 	private String mensagemErro;
 
+	@Column(name = "distancia_total_metros")
+	private Double distanciaTotalMetros;
+
+	@Column(name = "tempo_execucao_ms")
+	private Long tempoExecucaoMs;
+
 	@OneToMany(mappedBy = "operation", cascade = CascadeType.ALL, orphanRemoval = true)
 	@OrderBy("ordemVisita ASC")
 	private List<OperationPoint> points = new ArrayList<>();
@@ -83,8 +89,21 @@ public class Operation {
 		this.segments.clear();
 		this.segments.addAll(legs);
 		this.emissaoTotalKg = totalEmissionKg;
+		this.distanciaTotalMetros = legs.stream().mapToDouble(RouteSegment::getDistanciaMetros).sum();
 		this.mensagemErro = null;
 		this.status = OperationStatus.COMPLETED;
+	}
+
+	public void registrarTempoExecucao(long milissegundos) {
+		this.tempoExecucaoMs = milissegundos;
+	}
+
+	public Double getDistanciaTotalMetros() {
+		return distanciaTotalMetros;
+	}
+
+	public Long getTempoExecucaoMs() {
+		return tempoExecucaoMs;
 	}
 
 	public void fail(String message) {

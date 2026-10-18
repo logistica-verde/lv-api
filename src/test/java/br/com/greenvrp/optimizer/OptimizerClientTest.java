@@ -89,6 +89,41 @@ class OptimizerClientTest {
 	}
 
 	@Test
+	void sendsTheGeneticAlgorithmParametersInSnakeCaseWhenGiven() throws Exception {
+		AtomicReference<String> captured = new AtomicReference<>();
+		String responseJson = """
+			{"sequence":[0,1],"total_emission_kg":3.2,"total_distance_meters":1200.0,"segment_emissions":[]}
+			""";
+		OptimizerClient client = clientFor(fakeOptimizer(200, responseJson, captured), Duration.ofSeconds(5));
+		OptimizeRequest request = OptimizeRequest.of(
+			OptimizationCriterion.EMISSION, 7500.0, 2,
+			List.of(new PairSegment(0, 1, 1200.0, 35.0, 1.5)),
+			new OptimizeRequest.GaParams(250, 400, 0.9, 0.1));
+
+		client.optimize(request).get(5, TimeUnit.SECONDS);
+
+		assertThat(captured.get())
+			.contains("\"ga_params\":{")
+			.contains("\"population_size\":250")
+			.contains("\"generations\":400")
+			.contains("\"crossover_rate\":0.9")
+			.contains("\"mutation_rate\":0.1");
+	}
+
+	@Test
+	void leavesOutTheParametersWhenNoneAreGiven() throws Exception {
+		AtomicReference<String> captured = new AtomicReference<>();
+		String responseJson = """
+			{"sequence":[0,1],"total_emission_kg":3.2,"total_distance_meters":1200.0,"segment_emissions":[]}
+			""";
+		OptimizerClient client = clientFor(fakeOptimizer(200, responseJson, captured), Duration.ofSeconds(5));
+
+		client.optimize(sampleRequest()).get(5, TimeUnit.SECONDS);
+
+		assertThat(captured.get()).doesNotContain("ga_params");
+	}
+
+	@Test
 	void mapsHttpErrorToOptimizerException() throws Exception {
 		OptimizerClient client = clientFor(fakeOptimizer(500, "{\"detail\":\"boom\"}", null), Duration.ofSeconds(5));
 
