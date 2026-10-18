@@ -85,5 +85,6 @@ Na subida a API roda as migrations (Flyway) e avisa se o contrato não está con
 - A conta de teste do Besu em `.env.example` é pública. Só serve porque a porta do Besu não é publicada fora da rede do compose.
 - O Besu roda uma rede privada QBFT com um validador (chain ID `1337`, gás zero). A imagem está em `latest`; fixe uma versão antes da defesa, para o ambiente não mudar sozinho.
 - Os dados do banco e do Besu ficam em volumes do Docker. `docker compose down` mantém; `docker compose down -v` apaga tudo.
+- O serviço de elevação (Open-Topo-Data) não tem imagem pública; o compose a constrói a partir do código oficial, o que leva alguns minutos na primeira vez.
 - O OSRM e o serviço de elevação são pesados só na preparação dos dados. Rodando, usam pouca memória para uma cidade.
 - Para usar a tabela `malha_viaria` em vez do OSRM, defina `GEO_PROVIDER=database`.
