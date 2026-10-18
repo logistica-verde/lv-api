@@ -1,6 +1,11 @@
 package br.com.greenvrp.route;
 
 import br.com.greenvrp.optimizer.OptimizationCriterion;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.util.List;
@@ -11,11 +16,40 @@ public record RouteRequest(
 	Long vehicleId,
 
 	@NotNull
-	@Size(min = 2, max = 30)
+	@Size(min = 1, max = 30)
 	List<@NotNull Long> deliveryPointIds,
 
 	@NotNull
-	OptimizationCriterion criterion
+	OptimizationCriterion criterion,
+
+	@Valid
+	Origin origin
 
 ) {
+
+	public record Origin(
+
+		@NotNull
+		@DecimalMin("-90")
+		@DecimalMax("90")
+		Double latitude,
+
+		@NotNull
+		@DecimalMin("-180")
+		@DecimalMax("180")
+		Double longitude
+
+	) {
+	}
+
+	@JsonIgnore
+	@AssertTrue(message = "at least two delivery points are required without an origin")
+	public boolean isEnoughPoints() {
+		return origin != null || deliveryPointIds == null || deliveryPointIds.size() >= 2;
+	}
+
+	public RouteRequest(Long vehicleId, List<Long> deliveryPointIds, OptimizationCriterion criterion) {
+		this(vehicleId, deliveryPointIds, criterion, null);
+	}
+
 }

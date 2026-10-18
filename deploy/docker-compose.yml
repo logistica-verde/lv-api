@@ -95,6 +95,7 @@ services:
       LV_CORS_ALLOWED_ORIGINS: ${PUBLIC_URL:-http://localhost}
       LV_GEOCODER_USER_AGENT: ${LV_GEOCODER_USER_AGENT:-lv-api/1.0 (Logistica Verde Inteligente)}
       GEO_PROVIDER: ${GEO_PROVIDER:-osrm}
+      GEO_COVERAGE: ${GEO_COVERAGE:--24.10,-46.95,-23.25,-46.25}
       OSRM_URL: http://osrm:5000
       ELEVATION_URL: http://elevation:5000
 

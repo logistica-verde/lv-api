@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -220,6 +221,37 @@ class RouteProcessorTest {
 		verify(optimizerClient).optimize(sent.capture());
 		assertThat(sent.getValue().gaParams())
 			.isEqualTo(new OptimizeRequest.GaParams(250, 400, 0.9, 0.1));
+	}
+
+	@Test
+	void sendsAFixedSeedSoTheSameStopsGiveTheSameRoute() {
+		when(optimizerClient.optimize(any())).thenReturn(CompletableFuture.failedFuture(
+			new OptimizerException("Optimizer call failed: stop here", new RuntimeException())));
+
+		processor.processAsync(operationId).join();
+		processor.processAsync(operationId).join();
+
+		ArgumentCaptor<OptimizeRequest> sent = ArgumentCaptor.forClass(OptimizeRequest.class);
+		verify(optimizerClient, times(2)).optimize(sent.capture());
+		assertThat(sent.getAllValues().get(0).seed()).isNotNull();
+		assertThat(sent.getAllValues().get(0).seed()).isEqualTo(sent.getAllValues().get(1).seed());
+	}
+
+	@Test
+	void theSeedIsNeverNegativeEvenWithTheMaximumNumberOfPoints() {
+		List<Long> manyPoints = new ArrayList<>();
+		for (long id = 1_000_000L; id < 1_000_031L; id++) {
+			manyPoints.add(id);
+		}
+
+		assertThat(RouteProcessor.seedOf(manyPoints)).isGreaterThanOrEqualTo(0);
+		assertThat(RouteProcessor.seedOf(List.of(Long.MAX_VALUE, Long.MAX_VALUE))).isGreaterThanOrEqualTo(0);
+	}
+
+	@Test
+	void theSeedDependsOnTheStopsAndTheirOrder() {
+		assertThat(RouteProcessor.seedOf(List.of(1L, 2L, 3L))).isEqualTo(RouteProcessor.seedOf(List.of(1L, 2L, 3L)));
+		assertThat(RouteProcessor.seedOf(List.of(1L, 2L, 3L))).isNotEqualTo(RouteProcessor.seedOf(List.of(1L, 3L, 2L)));
 	}
 
 	@Test

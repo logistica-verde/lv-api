@@ -52,6 +52,37 @@ class RouteControllerTest {
 	}
 
 	@Test
+	void calculateAcceptsAnOriginInsteadOfASecondPoint() throws Exception {
+		given(routeService.calculate(any())).willReturn(new RouteAcceptedResponse(7L, OperationStatus.PENDING));
+
+		mockMvc.perform(post("/api/routes/calculate")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"vehicleId":1,"deliveryPointIds":[10],"criterion":"EMISSION",
+					 "origin":{"latitude":-23.5505,"longitude":-46.6333}}
+					"""))
+			.andExpect(status().isAccepted());
+	}
+
+	@Test
+	void calculateRejectsAnOriginWithCoordinatesOutOfRangeOrIncomplete() throws Exception {
+		mockMvc.perform(post("/api/routes/calculate")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"vehicleId":1,"deliveryPointIds":[10],"criterion":"EMISSION",
+					 "origin":{"latitude":91,"longitude":-46.6333}}
+					"""))
+			.andExpect(status().isBadRequest());
+		mockMvc.perform(post("/api/routes/calculate")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"vehicleId":1,"deliveryPointIds":[10],"criterion":"EMISSION",
+					 "origin":{"latitude":-23.5}}
+					"""))
+			.andExpect(status().isBadRequest());
+	}
+
+	@Test
 	void calculateRejectsSinglePoint() throws Exception {
 		mockMvc.perform(post("/api/routes/calculate")
 				.contentType(MediaType.APPLICATION_JSON)
