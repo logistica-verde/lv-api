@@ -12,7 +12,7 @@ import static org.mockito.Mockito.when;
 import br.com.greenvrp.blockchain.BlockchainService;
 import br.com.greenvrp.deliverypoint.DeliveryPoint;
 import br.com.greenvrp.deliverypoint.DeliveryPointRepository;
-import br.com.greenvrp.geo.GeoQueryService;
+import br.com.greenvrp.geo.PairSegmentSource;
 import br.com.greenvrp.geo.PairSegment;
 import br.com.greenvrp.geo.RoadDataNotFoundException;
 import br.com.greenvrp.optimizer.OptimizationCriterion;
@@ -55,7 +55,7 @@ class RouteProcessorTest {
 	@Autowired
 	private PlatformTransactionManager transactionManager;
 
-	private final GeoQueryService geoQueryService = mock(GeoQueryService.class);
+	private final PairSegmentSource geoQueryService = mock(PairSegmentSource.class);
 	private final OptimizerClient optimizerClient = mock(OptimizerClient.class);
 	private final BlockchainService blockchainService = mock(BlockchainService.class);
 	private final GaSettingsService gaSettingsService = mock(GaSettingsService.class);

@@ -2,7 +2,7 @@ package br.com.greenvrp.route;
 
 import br.com.greenvrp.blockchain.BlockchainService;
 import br.com.greenvrp.deliverypoint.DeliveryPoint;
-import br.com.greenvrp.geo.GeoQueryService;
+import br.com.greenvrp.geo.PairSegmentSource;
 import br.com.greenvrp.geo.PairSegment;
 import br.com.greenvrp.optimizer.InvalidOptimizerResponseException;
 import br.com.greenvrp.optimizer.OptimizeRequest;
@@ -46,7 +46,7 @@ public class RouteProcessor {
 	}
 
 	private final OperationRepository operationRepository;
-	private final GeoQueryService geoQueryService;
+	private final PairSegmentSource pairSegmentSource;
 	private final OptimizerClient optimizerClient;
 	private final BlockchainService blockchainService;
 	private final GaSettingsService gaSettingsService;
@@ -55,14 +55,14 @@ public class RouteProcessor {
 
 	public RouteProcessor(
 		OperationRepository operationRepository,
-		GeoQueryService geoQueryService,
+		PairSegmentSource pairSegmentSource,
 		OptimizerClient optimizerClient,
 		BlockchainService blockchainService,
 		GaSettingsService gaSettingsService,
 		PlatformTransactionManager transactionManager,
 		@Qualifier("routeExecutor") Executor executor) {
 		this.operationRepository = operationRepository;
-		this.geoQueryService = geoQueryService;
+		this.pairSegmentSource = pairSegmentSource;
 		this.optimizerClient = optimizerClient;
 		this.blockchainService = blockchainService;
 		this.gaSettingsService = gaSettingsService;
@@ -93,7 +93,7 @@ public class RouteProcessor {
 		return transactions.execute(status -> {
 			Operation operation = loadOperation(operationId);
 			List<DeliveryPoint> points = pointsOf(operation);
-			List<PairSegment> pairs = geoQueryService.buildPairSegments(points);
+			List<PairSegment> pairs = pairSegmentSource.buildPairSegments(points);
 			GaSettingsValues settings = gaSettingsService.current();
 			OptimizeRequest.GaParams gaParams = new OptimizeRequest.GaParams(
 				settings.populationSize(), settings.generations(), settings.crossoverRate(), settings.mutationRate());
