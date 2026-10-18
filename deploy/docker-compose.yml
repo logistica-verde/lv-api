@@ -68,7 +68,7 @@ services:
       context: ../../lv-optimizer
     restart: unless-stopped
     environment:
-      UVICORN_WORKERS: ${OPTIMIZER_WORKERS:-2}
+      OPTIMIZER_PROCESSES: ${OPTIMIZER_PROCESSES:-4}
 
   api:
     build:
