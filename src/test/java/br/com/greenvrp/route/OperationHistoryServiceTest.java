@@ -121,6 +121,7 @@ class OperationHistoryServiceTest {
 		OperationSummaryResponse item = page.items().get(0);
 		assertThat(item.vehicleId()).isEqualTo(second.getId());
 		assertThat(item.vehiclePlate()).isEqualTo("XYZ9K88");
+		assertThat(item.pointCount()).isEqualTo(2);
 		assertThat(item.criterion()).isEqualTo(OptimizationCriterion.DISTANCE);
 		assertThat(item.status()).isEqualTo(OperationStatus.COMPLETED);
 		assertThat(item.totalEmissionKg()).isEqualTo(6.5);

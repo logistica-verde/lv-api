@@ -80,7 +80,7 @@ class OperationHistoryControllerTest {
 	void returnsThePageInTheShapeTheFrontReads() throws Exception {
 		given(service.list(any())).willReturn(new OperationPageResponse(
 			List.of(new OperationSummaryResponse(
-				7L, Instant.parse("2026-10-05T12:00:00Z"), 1L, "ABC1D23", OptimizationCriterion.EMISSION,
+				7L, Instant.parse("2026-10-05T12:00:00Z"), 1L, "ABC1D23", 12, OptimizationCriterion.EMISSION,
 				OperationStatus.COMPLETED, 5.5, 2022.5, IntegrityStatus.VALID)),
 			24, 1, 10));
 
@@ -93,6 +93,7 @@ class OperationHistoryControllerTest {
 			.andExpect(jsonPath("$.items[0].createdAt").value("2026-10-05T12:00:00Z"))
 			.andExpect(jsonPath("$.items[0].vehicleId").value(1))
 			.andExpect(jsonPath("$.items[0].vehiclePlate").value("ABC1D23"))
+			.andExpect(jsonPath("$.items[0].pointCount").value(12))
 			.andExpect(jsonPath("$.items[0].criterion").value("EMISSION"))
 			.andExpect(jsonPath("$.items[0].status").value("COMPLETED"))
 			.andExpect(jsonPath("$.items[0].totalEmissionKg").value(5.5))
