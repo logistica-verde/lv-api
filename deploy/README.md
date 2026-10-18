@@ -1,11 +1,11 @@
 # Deploy com Docker
 
-Sobe o Lastro inteiro com `docker compose`: front, API, SQL Server, nó Besu, OSRM e o serviço de elevação. O `lv-optimizer` ainda não está no compose, porque o repositório dele não tem Dockerfile. Sem ele a API responde, mas o cálculo de rotas termina como `FAILED`.
+Sobe o Lastro inteiro com `docker compose`: front, API, otimizador, SQL Server, nó Besu, OSRM e o serviço de elevação.
 
 ## O que precisa existir
 
 - Docker 24 ou superior com o plugin `docker compose`
-- Os repositórios `lv-api` e `lv-frontend` lado a lado, na mesma pasta (o compose usa `../../lv-frontend`)
+- Os repositórios `lv-api`, `lv-frontend` e `lv-optimizer` lado a lado, na mesma pasta (o compose usa `../../lv-frontend` e `../../lv-optimizer`)
 - 8 GB de memória livre (o SQL Server pede pelo menos 2 GB) e 30 GB de disco
 
 ## Primeira vez
@@ -71,7 +71,7 @@ Na subida a API roda as migrations (Flyway) e avisa se o contrato não está con
    sudo usermod -aG docker $USER
    ```
 
-4. Clone `lv-api` e `lv-frontend` lado a lado e siga os passos de "Primeira vez".
+4. Clone `lv-api`, `lv-frontend` e `lv-optimizer` lado a lado e siga os passos de "Primeira vez".
 5. Para HTTPS, aponte um domínio para o IP da máquina e, no `.env`, defina `DOMAIN=seu.dominio`, `PUBLIC_URL=https://seu.dominio` e `WEB_PORT=8081`. Suba com:
 
    ```bash

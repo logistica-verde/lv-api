@@ -63,6 +63,11 @@ services:
       - ./elevation/config.yaml:/app/config.yaml:ro
       - ./data/srtm30m:/app/data/srtm30m:ro
 
+  optimizer:
+    build:
+      context: ../../lv-optimizer
+    restart: unless-stopped
+
   api:
     build:
       context: ..
@@ -72,6 +77,8 @@ services:
         condition: service_completed_successfully
       besu:
         condition: service_started
+      optimizer:
+        condition: service_healthy
     environment:
       DB_URL: jdbc:sqlserver://db:1433;databaseName=logistica_verde;encrypt=true;trustServerCertificate=true
       DB_USERNAME: sa
