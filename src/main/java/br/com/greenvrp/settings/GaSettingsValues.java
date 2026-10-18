@@ -30,6 +30,6 @@ public record GaSettingsValues(
 
 ) {
 
-	public static final GaSettingsValues DEFAULT = new GaSettingsValues(300, 1000, 0.9, 0.4);
+	public static final GaSettingsValues DEFAULT = new GaSettingsValues(300, 500, 0.9, 0.4);
 
 }
