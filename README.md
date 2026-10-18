@@ -45,8 +45,21 @@ A aplicacao le variaveis de ambiente (ou, alternativamente, as propriedades equi
 | `JWT_EXPIRATION` | `8h` | Validade do token (formato de duracao, por exemplo `30m`) |
 | `LV_ADMIN_EMAIL` / `LV_ADMIN_PASSWORD` | vazio | Se a tabela de usuarios estiver vazia, cria o primeiro administrador com esses dados |
 | `LV_ADMIN_NAME` | `Administrador` | Nome do primeiro administrador |
+| `GEO_PROVIDER` | `database` | De onde vem distancia, velocidade e inclinacao dos trechos: `database` (tabela `malha_viaria`) ou `osrm` (rotas do OSRM e altitudes) |
+| `OSRM_URL` | `http://localhost:5000` | URL do OSRM, usada com `GEO_PROVIDER=osrm` |
+| `ELEVATION_URL` / `ELEVATION_DATASET` | `http://localhost:5001` / `srtm30m` | Servico de altitude no formato Open-Topo-Data |
 | `LV_GEOCODER_URL` | `https://nominatim.openstreetmap.org/search` | Provedor da busca de enderecos (formato Nominatim) |
 | `LV_GEOCODER_USER_AGENT` | `lv-api/1.0 (Logistica Verde Inteligente)` | Identificacao enviada ao provedor; troque pelo nome e contato reais do projeto |
+
+## Rede viaria, altitude e inclinacao
+
+Com `GEO_PROVIDER=osrm`, a API monta os trechos entre os pontos pela rede viaria real, em vez de usar a linha reta:
+
+- **distancia e velocidade media** vem da rota do OSRM (`/route/v1/driving`): a distancia pelas ruas e a velocidade como distancia dividida pela duracao, limitada entre 5 e 90 km/h
+- **inclinacao** sai do perfil de altitude da geometria da rota: o trajeto e amostrado a cada 100 m, a altitude de cada amostra vem do servico de elevacao (SRTM de 30 m), as pontas sao suavizadas em tres amostras e a inclinacao liquida e `(altitude final - inicial) / distancia`, limitada a 15%. O sinal segue o sentido da viagem, entao A para B e B para A tem inclinacoes opostas. Trechos com menos de 50 m ficam com 0, porque o SRTM nao resolve distancias tao curtas
+- as altitudes ja consultadas ficam em memoria, em uma grade de cerca de 11 m
+
+O modo `database` continua o padrao. Como subir o OSRM e o servico de altitude esta em [`deploy/README.md`](deploy/README.md).
 
 ## Busca de enderecos
 
