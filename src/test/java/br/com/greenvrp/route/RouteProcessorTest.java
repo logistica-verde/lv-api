@@ -13,6 +13,7 @@ import br.com.greenvrp.blockchain.BlockchainService;
 import br.com.greenvrp.deliverypoint.DeliveryPoint;
 import br.com.greenvrp.deliverypoint.DeliveryPointRepository;
 import br.com.greenvrp.geo.PairSegmentSource;
+import br.com.greenvrp.geo.GeoPoint;
 import br.com.greenvrp.geo.PairSegment;
 import br.com.greenvrp.geo.RoadDataNotFoundException;
 import br.com.greenvrp.optimizer.OptimizationCriterion;
@@ -31,6 +32,7 @@ import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.locationtech.jts.geom.Coordinate;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -134,6 +136,35 @@ class RouteProcessorTest {
 				.containsExactly(
 					tuple(pointIds.get(1), pointIds.get(0), 2.0, 1010.0),
 					tuple(pointIds.get(0), pointIds.get(2), 3.5, 1002.0));
+			return null;
+		});
+	}
+
+	@Test
+	void keepsTheStreetGeometryOfEachLegBetweenTheDeliveryPoints() {
+		List<GeoPoint> street = List.of(new GeoPoint(-23.5502, -46.6302), new GeoPoint(-23.5601, -46.6350));
+		List<PairSegment> pairs = new ArrayList<>(allPairs(3));
+		pairs.replaceAll(pair -> pair.fromIndex() == 1 && pair.toIndex() == 0
+			? new PairSegment(1, 0, pair.distanceMeters(), pair.averageSpeedKmh(), pair.slopePercent(), street)
+			: pair);
+		when(geoQueryService.buildPairSegments(anyList())).thenReturn(pairs);
+		OptimizeResponse response = new OptimizeResponse(
+			List.of(1, 0, 2), 5.5, 2010.0,
+			List.of(new SegmentEmission(1, 0, 2.0), new SegmentEmission(0, 2, 3.5)));
+		when(optimizerClient.optimize(any())).thenReturn(CompletableFuture.completedFuture(response));
+
+		processor.processAsync(operationId).join();
+
+		inTransaction(() -> {
+			Operation operation = operationRepository.findById(operationId).orElseThrow();
+			Coordinate[] followed = operation.getSegments().get(0).getGeom().getCoordinates();
+			assertThat(followed).hasSize(4);
+			assertThat(followed[0].getY()).isEqualTo(-23.56);
+			assertThat(followed[1].getY()).isEqualTo(-23.5502);
+			assertThat(followed[1].getX()).isEqualTo(-46.6302);
+			assertThat(followed[3].getY()).isEqualTo(-23.55);
+			Coordinate[] straight = operation.getSegments().get(1).getGeom().getCoordinates();
+			assertThat(straight).hasSize(2);
 			return null;
 		});
 	}
