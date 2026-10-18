@@ -1,0 +1,136 @@
+name: lastro
+
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Express
+      MSSQL_SA_PASSWORD: ${DB_PASSWORD:?defina DB_PASSWORD no .env}
+    volumes:
+      - db-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q \"SELECT 1\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  db-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    environment:
+      DB_PASSWORD: ${DB_PASSWORD}
+    entrypoint:
+      - /bin/bash
+      - -c
+      - /opt/mssql-tools18/bin/sqlcmd -C -S db -U sa -P "$$DB_PASSWORD" -Q "IF DB_ID('logistica_verde') IS NULL CREATE DATABASE logistica_verde"
+
+  besu:
+    image: hyperledger/besu:latest
+    restart: unless-stopped
+    command:
+      - --network=dev
+      - --data-path=/var/lib/besu
+      - --miner-enabled
+      - --miner-coinbase=0xfe3b557e8fb62b89f4916b721be55ceb828dbd73
+      - --min-gas-price=0
+      - --rpc-http-enabled
+      - --rpc-http-host=0.0.0.0
+      - --rpc-http-api=ETH,NET,WEB3
+      - --host-allowlist=*
+    volumes:
+      - besu-data:/var/lib/besu
+
+  osrm:
+    image: ghcr.io/project-osrm/osrm-backend:latest
+    restart: unless-stopped
+    command: osrm-routed --algorithm mld --max-table-size 1000 /data/region.osrm
+    volumes:
+      - ./data/osrm:/data:ro
+
+  elevation:
+    image: ghcr.io/ajnisbet/opentopodata:latest
+    restart: unless-stopped
+    volumes:
+      - ./elevation/config.yaml:/app/config.yaml:ro
+      - ./data/srtm30m:/app/data/srtm30m:ro
+
+  api:
+    build:
+      context: ..
+    restart: unless-stopped
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+      besu:
+        condition: service_started
+    environment:
+      DB_URL: jdbc:sqlserver://db:1433;databaseName=logistica_verde;encrypt=true;trustServerCertificate=true
+      DB_USERNAME: sa
+      DB_PASSWORD: ${DB_PASSWORD}
+      OPTIMIZER_URL: ${OPTIMIZER_URL:-http://optimizer:8000}
+      BESU_RPC_URL: http://besu:8545
+      BESU_CHAIN_ID: ${BESU_CHAIN_ID:-2018}
+      BESU_CONTRACT_ADDRESS: ${BESU_CONTRACT_ADDRESS:-}
+      BESU_PRIVATE_KEY: ${BESU_PRIVATE_KEY:?defina BESU_PRIVATE_KEY no .env}
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no .env}
+      LV_ADMIN_EMAIL: ${LV_ADMIN_EMAIL:-}
+      LV_ADMIN_PASSWORD: ${LV_ADMIN_PASSWORD:-}
+      LV_ADMIN_NAME: ${LV_ADMIN_NAME:-Administrador}
+      LV_CORS_ALLOWED_ORIGINS: ${PUBLIC_URL:-http://localhost}
+      LV_GEOCODER_USER_AGENT: ${LV_GEOCODER_USER_AGENT:-lv-api/1.0 (Logistica Verde Inteligente)}
+      GEO_PROVIDER: ${GEO_PROVIDER:-osrm}
+      OSRM_URL: http://osrm:5000
+      ELEVATION_URL: http://elevation:5000
+
+  deploy-contract:
+    build:
+      context: ..
+    profiles: ["tools"]
+    restart: "no"
+    depends_on:
+      - besu
+    environment:
+      BESU_RPC_URL: http://besu:8545
+      BESU_CHAIN_ID: ${BESU_CHAIN_ID:-2018}
+      BESU_PRIVATE_KEY: ${BESU_PRIVATE_KEY}
+    entrypoint:
+      - java
+      - -cp
+      - app.jar
+      - -Dloader.main=br.com.greenvrp.blockchain.AuditRegistryDeployCli
+      - org.springframework.boot.loader.launch.PropertiesLauncher
+
+  web:
+    build:
+      context: ../../lv-frontend
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "${WEB_PORT:-80}:80"
+
+  caddy:
+    image: caddy:2
+    profiles: ["https"]
+    restart: unless-stopped
+    depends_on:
+      - web
+    environment:
+      DOMAIN: ${DOMAIN:?defina DOMAIN no .env para usar HTTPS}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+
+volumes:
+  caddy-data:
+  db-data:
+  besu-data:

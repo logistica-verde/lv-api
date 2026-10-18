@@ -1,0 +1,5 @@
+max_locations_per_request: 100
+datasets:
+  - name: srtm30m
+    path: data/srtm30m/
+    filename_tile_size: 1
