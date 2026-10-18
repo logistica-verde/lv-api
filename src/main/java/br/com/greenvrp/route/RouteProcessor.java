@@ -100,17 +100,17 @@ public class RouteProcessor {
 				settings.populationSize(), settings.generations(), settings.crossoverRate(), settings.mutationRate());
 			OptimizeRequest request = OptimizeRequest.of(
 				operation.getCriterio(), operation.getVehicle().getMassaKg(), points.size(), pairs, gaParams,
-				seedOf(points));
+				seedOf(points.stream().map(DeliveryPoint::getId).toList()));
 			return new Prepared(request, pairs);
 		});
 	}
 
-	private static long seedOf(List<DeliveryPoint> points) {
+	static long seedOf(List<Long> pointIds) {
 		long seed = 17;
-		for (DeliveryPoint point : points) {
-			seed = seed * 31 + point.getId();
+		for (Long id : pointIds) {
+			seed = seed * 31 + id;
 		}
-		return seed;
+		return seed & Long.MAX_VALUE;
 	}
 
 	private static long elapsedMillis(long startedAtNanos) {

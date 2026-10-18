@@ -238,6 +238,23 @@ class RouteProcessorTest {
 	}
 
 	@Test
+	void theSeedIsNeverNegativeEvenWithTheMaximumNumberOfPoints() {
+		List<Long> manyPoints = new ArrayList<>();
+		for (long id = 1_000_000L; id < 1_000_031L; id++) {
+			manyPoints.add(id);
+		}
+
+		assertThat(RouteProcessor.seedOf(manyPoints)).isGreaterThanOrEqualTo(0);
+		assertThat(RouteProcessor.seedOf(List.of(Long.MAX_VALUE, Long.MAX_VALUE))).isGreaterThanOrEqualTo(0);
+	}
+
+	@Test
+	void theSeedDependsOnTheStopsAndTheirOrder() {
+		assertThat(RouteProcessor.seedOf(List.of(1L, 2L, 3L))).isEqualTo(RouteProcessor.seedOf(List.of(1L, 2L, 3L)));
+		assertThat(RouteProcessor.seedOf(List.of(1L, 2L, 3L))).isNotEqualTo(RouteProcessor.seedOf(List.of(1L, 3L, 2L)));
+	}
+
+	@Test
 	void sendsTheDefaultParametersWhenNothingWasConfigured() {
 		when(optimizerClient.optimize(any())).thenReturn(CompletableFuture.failedFuture(
 			new OptimizerException("Optimizer call failed: stop here", new RuntimeException())));
