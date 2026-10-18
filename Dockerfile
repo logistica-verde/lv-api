@@ -2,7 +2,7 @@ FROM eclipse-temurin:17-jdk AS build
 WORKDIR /workspace
 COPY .mvn .mvn
 COPY mvnw pom.xml ./
-RUN ./mvnw -B -q dependency:go-offline
+RUN chmod +x mvnw && ./mvnw -B -q dependency:go-offline
 COPY src src
 COPY contracts contracts
 RUN ./mvnw -B -q -DskipTests package && cp target/lv-api-*.jar app.jar
