@@ -20,7 +20,7 @@ class GaSettingsServiceTest {
 	@Test
 	void usesTheDefaultsWhileNothingWasSaved() {
 		assertThat(service.current()).isEqualTo(GaSettingsValues.DEFAULT);
-		assertThat(GaSettingsValues.DEFAULT).isEqualTo(new GaSettingsValues(100, 200, 0.8, 0.05));
+		assertThat(GaSettingsValues.DEFAULT).isEqualTo(new GaSettingsValues(300, 1000, 0.9, 0.4));
 	}
 
 	@Test

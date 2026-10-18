@@ -44,15 +44,15 @@ class SchemaMigrationTest {
 	}
 
 	@Test
-	void seedsTheDefaultGeneticAlgorithmParameters() {
+	void seedsTheTunedGeneticAlgorithmParameters() {
 		JdbcTemplate jdbc = new JdbcTemplate(dataSource);
 
 		var row = jdbc.queryForMap("SELECT populacao, geracoes, taxa_cruzamento, taxa_mutacao FROM parametros_ag");
 
-		assertThat(row.get("populacao")).isEqualTo(100);
-		assertThat(row.get("geracoes")).isEqualTo(200);
-		assertThat(((Number) row.get("taxa_cruzamento")).doubleValue()).isEqualTo(0.8);
-		assertThat(((Number) row.get("taxa_mutacao")).doubleValue()).isEqualTo(0.05);
+		assertThat(row.get("populacao")).isEqualTo(300);
+		assertThat(row.get("geracoes")).isEqualTo(1000);
+		assertThat(((Number) row.get("taxa_cruzamento")).doubleValue()).isEqualTo(0.9);
+		assertThat(((Number) row.get("taxa_mutacao")).doubleValue()).isEqualTo(0.4);
 	}
 
 	@Test
