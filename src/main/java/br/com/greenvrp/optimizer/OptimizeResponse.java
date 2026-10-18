@@ -1,5 +1,6 @@
 package br.com.greenvrp.optimizer;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
@@ -9,7 +10,7 @@ public record OptimizeResponse(
 	@JsonProperty("total_emission_kg") double totalEmissionKg,
 	@JsonProperty("total_distance_meters") double totalDistanceMeters,
 	@JsonProperty("segment_emissions") List<SegmentEmission> segmentEmissions,
-	@JsonProperty("convergence") List<Double> convergence
+	@JsonProperty("convergence") @JsonAlias("best_fitness_history") List<Double> convergence
 
 ) {
 
