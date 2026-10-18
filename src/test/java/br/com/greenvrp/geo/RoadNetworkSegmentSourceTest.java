@@ -60,6 +60,17 @@ class RoadNetworkSegmentSourceTest {
 	}
 
 	@Test
+	void carriesTheStreetGeometryOfEachRoute() {
+		when(osrmClient.route(LOW_POINT, HIGH_POINT)).thenReturn(northward(100));
+		when(osrmClient.route(HIGH_POINT, LOW_POINT)).thenReturn(southward(100));
+
+		List<PairSegment> segments = source.buildPairSegments(List.of(low, high));
+
+		assertThat(segments.get(0).geometry()).containsExactly(LOW_POINT, HIGH_POINT);
+		assertThat(segments.get(1).geometry()).containsExactly(HIGH_POINT, LOW_POINT);
+	}
+
+	@Test
 	void usesTheDistanceOfTheRoadAndNotTheStraightLine() {
 		when(osrmClient.route(any(), any())).thenReturn(northward(100));
 

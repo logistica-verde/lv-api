@@ -2,6 +2,7 @@ package br.com.greenvrp.route;
 
 import br.com.greenvrp.optimizer.OptimizationCriterion;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 
@@ -36,8 +37,22 @@ public record RouteResponse(
 		double distanceMeters,
 		double averageSpeedKmh,
 		double slopePercent,
-		double emissionKg
+		double emissionKg,
+		List<List<Double>> geometry
 	) {
+
+		public SegmentItem(
+			Long fromPointId, Long toPointId, double distanceMeters, double averageSpeedKmh, double slopePercent,
+			double emissionKg) {
+			this(fromPointId, toPointId, distanceMeters, averageSpeedKmh, slopePercent, emissionKg, List.of());
+		}
+
+	}
+
+	private static List<List<Double>> latLngOf(RouteSegment segment) {
+		return Arrays.stream(segment.getGeom().getCoordinates())
+			.map(coordinate -> List.of(coordinate.getY(), coordinate.getX()))
+			.toList();
 	}
 
 	public static RouteResponse from(Operation operation) {
@@ -57,7 +72,8 @@ public record RouteResponse(
 				segment.getDistanciaMetros(),
 				segment.getVelocidadeMedia(),
 				segment.getDeclividade(),
-				segment.getEmissaoKgCo2()))
+				segment.getEmissaoKgCo2(),
+				latLngOf(segment)))
 			.toList();
 		Double totalDistance = segments.isEmpty()
 			? null

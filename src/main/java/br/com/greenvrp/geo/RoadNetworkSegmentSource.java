@@ -81,7 +81,8 @@ public class RoadNetworkSegmentSource implements PairSegmentSource {
 			item.leg().to(),
 			item.path().distanceMeters(),
 			speedOf(item.path()),
-			SlopeCalculator.slopePercent(profile, item.path().distanceMeters()));
+			SlopeCalculator.slopePercent(profile, item.path().distanceMeters()),
+			item.path().geometry());
 	}
 
 	private double speedOf(RoadPath path) {

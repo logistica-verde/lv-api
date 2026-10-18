@@ -10,6 +10,7 @@ import br.com.greenvrp.optimizer.OptimizeResponse;
 import br.com.greenvrp.optimizer.OptimizerClient;
 import br.com.greenvrp.settings.GaSettingsService;
 import br.com.greenvrp.settings.GaSettingsValues;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -152,7 +153,7 @@ public class RouteProcessor {
 				DeliveryPoint destination = points.get(leg.to());
 				return new RouteSegment(
 					operation, origin, destination, position + 1,
-					lineBetween(origin, destination),
+					lineOf(pair, origin, destination),
 					pair.averageSpeedKmh(), pair.slopePercent(), emission, pair.distanceMeters());
 			})
 			.toList();
@@ -198,6 +199,17 @@ public class RouteProcessor {
 
 	private List<DeliveryPoint> pointsOf(Operation operation) {
 		return operation.getPoints().stream().map(OperationPoint::getPoint).toList();
+	}
+
+	private LineString lineOf(PairSegment pair, DeliveryPoint origin, DeliveryPoint destination) {
+		if (pair.geometry() == null || pair.geometry().size() < 2) {
+			return lineBetween(origin, destination);
+		}
+		List<Coordinate> path = new ArrayList<>();
+		path.add(origin.getGeom().getCoordinate());
+		pair.geometry().forEach(point -> path.add(new Coordinate(point.longitude(), point.latitude())));
+		path.add(destination.getGeom().getCoordinate());
+		return GEOMETRY_FACTORY.createLineString(path.toArray(new Coordinate[0]));
 	}
 
 	private LineString lineBetween(DeliveryPoint origin, DeliveryPoint destination) {

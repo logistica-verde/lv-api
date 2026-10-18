@@ -138,6 +138,34 @@ class RouteControllerTest {
 	}
 
 	@Test
+	void returnsTheStreetGeometryOfEachSegmentAsLatitudeAndLongitude() throws Exception {
+		RouteResponse response = new RouteResponse(
+			7L, 1L, OptimizationCriterion.EMISSION, OperationStatus.COMPLETED, Instant.parse("2026-10-05T12:00:00Z"),
+			5.5, 2010.0, 842L, null,
+			List.of(new RouteResponse.PointItem(10L, "P1", -23.55, -46.63, 1)),
+			List.of(new RouteResponse.SegmentItem(
+				10L, 11L, 1010.0, 40.0, 2.0, 2.0, List.of(List.of(-23.55, -46.63), List.of(-23.56, -46.64)))));
+		given(routeService.get(7L)).willReturn(response);
+
+		mockMvc.perform(get("/api/routes/7"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.segments[0].geometry[0][0]").value(-23.55))
+			.andExpect(jsonPath("$.segments[0].geometry[0][1]").value(-46.63))
+			.andExpect(jsonPath("$.segments[0].geometry[1][0]").value(-23.56));
+	}
+
+	@Test
+	void segmentsWithoutGeometryAnswerAnEmptyList() throws Exception {
+		given(routeService.get(7L)).willReturn(new RouteResponse(
+			7L, 1L, OptimizationCriterion.EMISSION, OperationStatus.COMPLETED, Instant.parse("2026-10-05T12:00:00Z"),
+			5.5, 2010.0, 842L, null, List.of(),
+			List.of(new RouteResponse.SegmentItem(10L, 11L, 1010.0, 40.0, 2.0, 2.0))));
+
+		mockMvc.perform(get("/api/routes/7"))
+			.andExpect(jsonPath("$.segments[0].geometry").isEmpty());
+	}
+
+	@Test
 	void pendingRoutesHaveNoExecutionTimeYet() throws Exception {
 		RouteResponse pending = new RouteResponse(
 			8L, 1L, OptimizationCriterion.EMISSION, OperationStatus.PENDING, Instant.parse("2026-10-05T12:00:00Z"),
