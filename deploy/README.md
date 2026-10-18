@@ -22,9 +22,12 @@ Preencha no `.env` pelo menos `DB_PASSWORD`, `JWT_SECRET`, `LV_ADMIN_EMAIL` e `L
 ```bash
 ./scripts/prepare-srtm.sh
 ./scripts/prepare-osrm.sh
+./scripts/prepare-besu.sh
 ```
 
 O primeiro baixa o bloco SRTM da cidade de São Paulo (`S24W047`, cerca de 25 MB). O segundo baixa o mapa da cidade e prepara o OSRM, o que leva alguns minutos. Para outra região, mude `TILES` e `PBF_URL`. Se a URL de download de algum deles mudar, o script falha na hora com a mensagem do `curl`.
+
+O terceiro gera a rede privada do Besu (QBFT, um validador, chain ID `1337`). Se você trocar o chain ID depois, apague a pasta `data/besu` e os volumes (`docker compose down -v`).
 
 **2. Banco e rede Besu:**
 
@@ -80,7 +83,7 @@ Na subida a API roda as migrations (Flyway) e avisa se o contrato não está con
 ## Observações
 
 - A conta de teste do Besu em `.env.example` é pública. Só serve porque a porta do Besu não é publicada fora da rede do compose.
-- O Besu usa a rede `dev` (chain ID `2018`). A imagem está em `latest`; fixe uma versão antes da defesa, para o ambiente não mudar sozinho.
+- O Besu roda uma rede privada QBFT com um validador (chain ID `1337`, gás zero). A imagem está em `latest`; fixe uma versão antes da defesa, para o ambiente não mudar sozinho.
 - Os dados do banco e do Besu ficam em volumes do Docker. `docker compose down` mantém; `docker compose down -v` apaga tudo.
 - O OSRM e o serviço de elevação são pesados só na preparação dos dados. Rodando, usam pouca memória para uma cidade.
 - Para usar a tabela `malha_viaria` em vez do OSRM, defina `GEO_PROVIDER=database`.
