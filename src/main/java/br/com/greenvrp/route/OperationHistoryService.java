@@ -27,6 +27,7 @@ public class OperationHistoryService {
 		Instant createdAt,
 		Long vehicleId,
 		String vehiclePlate,
+		int pointCount,
 		OptimizationCriterion criterion,
 		OperationStatus status,
 		Double totalEmissionKg,
@@ -39,6 +40,7 @@ public class OperationHistoryService {
 				operation.getDataHora(),
 				operation.getVehicle().getId(),
 				operation.getVehicle().getPlaca(),
+				operation.getPoints().size(),
 				operation.getCriterio(),
 				operation.getStatus(),
 				operation.getEmissaoTotalKg(),
@@ -138,7 +140,8 @@ public class OperationHistoryService {
 		for (int index = 0; index < rows.size(); index++) {
 			Row row = rows.get(index);
 			items.add(new OperationSummaryResponse(
-				row.id(), row.createdAt(), row.vehicleId(), row.vehiclePlate(), row.criterion(), row.status(),
+				row.id(), row.createdAt(), row.vehicleId(), row.vehiclePlate(), row.pointCount(), row.criterion(),
+				row.status(),
 				row.totalEmissionKg(), row.totalDistanceMeters(), statuses.get(index)));
 		}
 		return items;

@@ -10,6 +10,7 @@ public record OperationSummaryResponse(
 	Instant createdAt,
 	Long vehicleId,
 	String vehiclePlate,
+	int pointCount,
 	OptimizationCriterion criterion,
 	OperationStatus status,
 	Double totalEmissionKg,
