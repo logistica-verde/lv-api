@@ -22,6 +22,7 @@ public class RouteService {
 
 	static final String ORIGIN_NAME = "Minha localização";
 	private static final double ORIGIN_GRID = 10_000.0;
+	private static final Object ORIGIN_LOCK = new Object();
 
 	private final VehicleRepository vehicleRepository;
 	private final DeliveryPointRepository deliveryPointRepository;
@@ -82,11 +83,13 @@ public class RouteService {
 		double latitude = roundedToTheGrid(origin.latitude());
 		double longitude = roundedToTheGrid(origin.longitude());
 		String key = "%.4f,%.4f".formatted(latitude, longitude);
-		return deliveryPointRepository.findFirstByNomeAndEndereco(ORIGIN_NAME, key).orElseGet(() -> {
-			DeliveryPoint point = new DeliveryPoint(ORIGIN_NAME, key, latitude, longitude);
-			point.desativar();
-			return deliveryPointRepository.save(point);
-		});
+		synchronized (ORIGIN_LOCK) {
+			return deliveryPointRepository.findFirstByNomeAndEndereco(ORIGIN_NAME, key).orElseGet(() -> {
+				DeliveryPoint point = new DeliveryPoint(ORIGIN_NAME, key, latitude, longitude);
+				point.desativar();
+				return deliveryPointRepository.save(point);
+			});
+		}
 	}
 
 	private static double roundedToTheGrid(double value) {
