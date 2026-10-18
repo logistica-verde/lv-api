@@ -61,6 +61,21 @@ class OptimizerClientTest {
 	}
 
 	@Test
+	void readsTheConvergenceUnderTheNameTheOptimizerUses() throws Exception {
+		String responseJson = """
+			{"sequence":[0,1],"total_emission_kg":3.2,"total_distance_meters":1200.0,
+			 "segment_emissions":[{"from_index":0,"to_index":1,"emission_kg":3.2}],
+			 "generations":3,"elapsed_seconds":0.4,"converged_at_generation":2,
+			 "best_fitness_history":[5.0,4.1,3.2,3.2]}
+			""";
+		OptimizerClient client = clientFor(fakeOptimizer(200, responseJson, null), Duration.ofSeconds(5));
+
+		OptimizeResponse response = client.optimize(sampleRequest()).get(5, TimeUnit.SECONDS);
+
+		assertThat(response.convergence()).containsExactly(5.0, 4.1, 3.2, 3.2);
+	}
+
+	@Test
 	void postsSnakeCaseRequestAndParsesResponse() throws Exception {
 		AtomicReference<String> captured = new AtomicReference<>();
 		String responseJson = """
