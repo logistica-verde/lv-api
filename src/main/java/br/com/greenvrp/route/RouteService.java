@@ -7,6 +7,9 @@ import br.com.greenvrp.deliverypoint.DeliveryPointRepository;
 import br.com.greenvrp.vehicle.Vehicle;
 import br.com.greenvrp.vehicle.VehicleRepository;
 import br.com.greenvrp.optimizer.OptimizationCriterion;
+import br.com.greenvrp.geo.CoverageArea;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -17,20 +20,26 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class RouteService {
 
+	static final String ORIGIN_NAME = "Minha localização";
+	private static final double ORIGIN_GRID = 10_000.0;
+
 	private final VehicleRepository vehicleRepository;
 	private final DeliveryPointRepository deliveryPointRepository;
 	private final OperationRepository operationRepository;
 	private final RouteProcessor routeProcessor;
+	private final CoverageArea coverageArea;
 
 	public RouteService(
 		VehicleRepository vehicleRepository,
 		DeliveryPointRepository deliveryPointRepository,
 		OperationRepository operationRepository,
-		RouteProcessor routeProcessor) {
+		RouteProcessor routeProcessor,
+		CoverageArea coverageArea) {
 		this.vehicleRepository = vehicleRepository;
 		this.deliveryPointRepository = deliveryPointRepository;
 		this.operationRepository = operationRepository;
 		this.routeProcessor = routeProcessor;
+		this.coverageArea = coverageArea;
 	}
 
 	public RouteAcceptedResponse calculate(RouteRequest request) {
@@ -39,11 +48,49 @@ public class RouteService {
 			throw new InvalidRequestException("deliveryPointIds must not contain duplicates");
 		}
 		Vehicle vehicle = activeVehicle(request.vehicleId());
-		List<DeliveryPoint> points = pointIds.stream().map(this::activePoint).toList();
+		List<DeliveryPoint> points = request.origin() == null
+			? withoutOrigin(pointIds)
+			: withOrigin(request.origin(), pointIds);
 
 		Operation operation = operationRepository.save(Operation.pending(vehicle, request.criterion(), points));
 		routeProcessor.processAsync(operation.getId());
 		return new RouteAcceptedResponse(operation.getId(), operation.getStatus());
+	}
+
+	private List<DeliveryPoint> withoutOrigin(List<Long> pointIds) {
+		if (pointIds.size() < 2) {
+			throw new InvalidRequestException("At least two delivery points are required without an origin");
+		}
+		return pointIds.stream().map(this::activePoint).toList();
+	}
+
+	private List<DeliveryPoint> withOrigin(RouteRequest.Origin origin, List<Long> pointIds) {
+		if (!coverageArea.contains(origin.latitude(), origin.longitude())) {
+			throw new InvalidRequestException("The origin is outside the area covered by the road map");
+		}
+		List<DeliveryPoint> stops = pointIds.stream()
+			.map(this::activePoint)
+			.sorted(Comparator.comparing(DeliveryPoint::getId))
+			.toList();
+		List<DeliveryPoint> points = new ArrayList<>();
+		points.add(originPoint(origin));
+		points.addAll(stops);
+		return points;
+	}
+
+	private DeliveryPoint originPoint(RouteRequest.Origin origin) {
+		double latitude = roundedToTheGrid(origin.latitude());
+		double longitude = roundedToTheGrid(origin.longitude());
+		String key = "%.4f,%.4f".formatted(latitude, longitude);
+		return deliveryPointRepository.findFirstByNomeAndEndereco(ORIGIN_NAME, key).orElseGet(() -> {
+			DeliveryPoint point = new DeliveryPoint(ORIGIN_NAME, key, latitude, longitude);
+			point.desativar();
+			return deliveryPointRepository.save(point);
+		});
+	}
+
+	private static double roundedToTheGrid(double value) {
+		return Math.round(value * ORIGIN_GRID) / ORIGIN_GRID;
 	}
 
 	@Transactional(readOnly = true)

@@ -9,6 +9,7 @@ import br.com.greenvrp.api.InvalidRequestException;
 import br.com.greenvrp.api.ResourceNotFoundException;
 import br.com.greenvrp.deliverypoint.DeliveryPoint;
 import br.com.greenvrp.deliverypoint.DeliveryPointRepository;
+import br.com.greenvrp.geo.CoverageArea;
 import br.com.greenvrp.optimizer.OptimizationCriterion;
 import br.com.greenvrp.vehicle.Vehicle;
 import br.com.greenvrp.vehicle.VehicleRepository;
@@ -21,7 +22,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @DataJpaTest
-@Import(RouteService.class)
+@Import({RouteService.class, CoverageArea.class})
 class RouteServiceTest {
 
 	@Autowired

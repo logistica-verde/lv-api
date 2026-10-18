@@ -99,9 +99,18 @@ public class RouteProcessor {
 			OptimizeRequest.GaParams gaParams = new OptimizeRequest.GaParams(
 				settings.populationSize(), settings.generations(), settings.crossoverRate(), settings.mutationRate());
 			OptimizeRequest request = OptimizeRequest.of(
-				operation.getCriterio(), operation.getVehicle().getMassaKg(), points.size(), pairs, gaParams);
+				operation.getCriterio(), operation.getVehicle().getMassaKg(), points.size(), pairs, gaParams,
+				seedOf(points));
 			return new Prepared(request, pairs);
 		});
+	}
+
+	private static long seedOf(List<DeliveryPoint> points) {
+		long seed = 17;
+		for (DeliveryPoint point : points) {
+			seed = seed * 31 + point.getId();
+		}
+		return seed;
 	}
 
 	private static long elapsedMillis(long startedAtNanos) {

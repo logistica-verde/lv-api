@@ -46,10 +46,19 @@ A aplicacao le variaveis de ambiente (ou, alternativamente, as propriedades equi
 | `LV_ADMIN_EMAIL` / `LV_ADMIN_PASSWORD` | vazio | Se a tabela de usuarios estiver vazia, cria o primeiro administrador com esses dados |
 | `LV_ADMIN_NAME` | `Administrador` | Nome do primeiro administrador |
 | `GEO_PROVIDER` | `database` | De onde vem distancia, velocidade e inclinacao dos trechos: `database` (tabela `malha_viaria`) ou `osrm` (rotas do OSRM e altitudes) |
+| `GEO_COVERAGE` | vazio | Area coberta pelo mapa do OSRM (`minLat,minLon,maxLat,maxLon`). Com ela, uma saida fora da area e recusada; vazio aceita qualquer lugar |
 | `OSRM_URL` | `http://localhost:5000` | URL do OSRM, usada com `GEO_PROVIDER=osrm` |
 | `ELEVATION_URL` / `ELEVATION_DATASET` | `http://localhost:5001` / `srtm30m` | Servico de altitude no formato Open-Topo-Data |
 | `LV_GEOCODER_URL` | `https://nominatim.openstreetmap.org/search` | Provedor da busca de enderecos (formato Nominatim) |
 | `LV_GEOCODER_USER_AGENT` | `lv-api/1.0 (Logistica Verde Inteligente)` | Identificacao enviada ao provedor; troque pelo nome e contato reais do projeto |
+
+## Saida pela localizacao atual
+
+`POST /api/routes/calculate` aceita `origin` (`latitude` e `longitude`). A saida vira o primeiro ponto do calculo e as demais paradas entram em ordem fixa (por id), entao a ordem em que o usuario escolheu os pontos nao muda o resultado. Com `origin`, uma unica parada ja basta; sem ele, continuam sendo necessarias duas e o primeiro ponto da lista faz o papel de saida.
+
+- A saida vira um ponto de entrega "Minha localizacao", inativo (nao aparece na lista de pontos). As coordenadas sao arredondadas para cerca de 11 m, e duas chamadas com a mesma localizacao reaproveitam o mesmo ponto, o que mantem as duas rotas (menor emissao e menor distancia) comparaveis.
+- Com `GEO_COVERAGE` definido, uma saida fora da area do mapa recebe `400`. Sem isso o OSRM encaixaria o ponto na estrada mais proxima da borda do mapa e a rota seria enganosa.
+- A API envia ao otimizador uma semente derivada dos pontos, entao os mesmos pontos com a mesma saida geram sempre a mesma rota.
 
 ## Rede viaria, altitude e inclinacao
 
