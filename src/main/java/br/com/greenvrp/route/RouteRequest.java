@@ -23,7 +23,11 @@ public record RouteRequest(
 	OptimizationCriterion criterion,
 
 	@Valid
-	Origin origin
+	Origin origin,
+
+	@DecimalMin("0")
+	@DecimalMax("100000")
+	Double cargoKg
 
 ) {
 
@@ -49,7 +53,12 @@ public record RouteRequest(
 	}
 
 	public RouteRequest(Long vehicleId, List<Long> deliveryPointIds, OptimizationCriterion criterion) {
-		this(vehicleId, deliveryPointIds, criterion, null);
+		this(vehicleId, deliveryPointIds, criterion, null, null);
+	}
+
+	public RouteRequest(
+		Long vehicleId, List<Long> deliveryPointIds, OptimizationCriterion criterion, Origin origin) {
+		this(vehicleId, deliveryPointIds, criterion, origin, null);
 	}
 
 }

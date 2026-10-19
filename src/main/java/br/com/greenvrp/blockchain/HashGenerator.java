@@ -36,6 +36,7 @@ public class HashGenerator {
 			.append(",\"vehicleId\":").append(operation.getVehicle().getId())
 			.append(",\"criterion\":\"").append(operation.getCriterio().name()).append('"')
 			.append(",\"createdAt\":\"").append(operation.getDataHora().truncatedTo(ChronoUnit.MILLIS)).append('"')
+			.append(cargo(operation))
 			.append(",\"totalEmissionKg\":").append(number(operation.getEmissaoTotalKg()))
 			.append(",\"points\":[");
 		for (int index = 0; index < points.size(); index++) {
@@ -57,6 +58,10 @@ public class HashGenerator {
 				.append(",\"emissionKg\":").append(number(segment.getEmissaoKgCo2())).append('}');
 		}
 		return json.append("]}").toString();
+	}
+
+	private String cargo(Operation operation) {
+		return operation.getCargaKg() == null ? "" : ",\"cargoKg\":" + number(operation.getCargaKg());
 	}
 
 	private String number(Double value) {

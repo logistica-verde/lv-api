@@ -58,6 +58,9 @@ public class Operation {
 	@Column(name = "tempo_execucao_ms")
 	private Long tempoExecucaoMs;
 
+	@Column(name = "carga_kg")
+	private Double cargaKg;
+
 	@OneToMany(mappedBy = "operation", cascade = CascadeType.ALL, orphanRemoval = true)
 	@OrderBy("ordemVisita ASC")
 	private List<OperationPoint> points = new ArrayList<>();
@@ -70,11 +73,17 @@ public class Operation {
 	}
 
 	public static Operation pending(Vehicle vehicle, OptimizationCriterion criterion, List<DeliveryPoint> points) {
+		return pending(vehicle, criterion, points, null);
+	}
+
+	public static Operation pending(
+		Vehicle vehicle, OptimizationCriterion criterion, List<DeliveryPoint> points, Double cargoKg) {
 		Operation operation = new Operation();
 		operation.vehicle = vehicle;
 		operation.criterio = criterion;
 		operation.dataHora = Instant.now().truncatedTo(ChronoUnit.MILLIS);
 		operation.status = OperationStatus.PENDING;
+		operation.cargaKg = cargoKg == null || cargoKg <= 0 ? null : cargoKg;
 		for (int index = 0; index < points.size(); index++) {
 			operation.points.add(new OperationPoint(operation, points.get(index), index + 1));
 		}
@@ -100,6 +109,14 @@ public class Operation {
 
 	public Double getDistanciaTotalMetros() {
 		return distanciaTotalMetros;
+	}
+
+	public Double getCargaKg() {
+		return cargaKg;
+	}
+
+	public double getMassaTotalKg() {
+		return vehicle.getMassaKg() + (cargaKg == null ? 0.0 : cargaKg);
 	}
 
 	public Long getTempoExecucaoMs() {

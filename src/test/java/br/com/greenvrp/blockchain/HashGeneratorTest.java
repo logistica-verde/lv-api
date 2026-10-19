@@ -69,6 +69,16 @@ class HashGeneratorTest {
 	}
 
 	@Test
+	void includesTheCargoWeightOnlyWhenTheOperationCarriesOne() {
+		Operation loaded = baseline();
+		ReflectionTestUtils.setField(loaded, "cargaKg", 1200.0);
+
+		assertThat(generator.canonicalJson(loaded))
+			.contains("\"createdAt\":\"2026-10-05T12:00:00.123Z\",\"cargoKg\":1200.000000,\"totalEmissionKg\":5.500000");
+		assertThat(generator.hash(loaded)).isNotEqualTo(generator.hash(baseline()));
+	}
+
+	@Test
 	void producesTheKnownSha256ForTheCanonicalJson() {
 		assertThat(generator.hash(baseline())).isEqualTo(GOLDEN_HASH);
 	}
