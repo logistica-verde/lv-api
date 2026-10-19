@@ -67,6 +67,8 @@ services:
     build:
       context: ../../lv-optimizer
     restart: unless-stopped
+    environment:
+      OPTIMIZER_PROCESSES: ${OPTIMIZER_PROCESSES:-4}
 
   api:
     build:

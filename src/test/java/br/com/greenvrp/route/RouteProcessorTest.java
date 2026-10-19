@@ -263,7 +263,7 @@ class RouteProcessorTest {
 
 		ArgumentCaptor<OptimizeRequest> sent = ArgumentCaptor.forClass(OptimizeRequest.class);
 		verify(optimizerClient).optimize(sent.capture());
-		assertThat(sent.getValue().gaParams()).isEqualTo(new OptimizeRequest.GaParams(300, 1000, 0.9, 0.4));
+		assertThat(sent.getValue().gaParams()).isEqualTo(new OptimizeRequest.GaParams(300, 500, 0.9, 0.4));
 	}
 
 	@Test

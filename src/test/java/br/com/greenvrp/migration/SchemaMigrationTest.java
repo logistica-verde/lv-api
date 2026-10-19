@@ -50,7 +50,7 @@ class SchemaMigrationTest {
 		var row = jdbc.queryForMap("SELECT populacao, geracoes, taxa_cruzamento, taxa_mutacao FROM parametros_ag");
 
 		assertThat(row.get("populacao")).isEqualTo(300);
-		assertThat(row.get("geracoes")).isEqualTo(1000);
+		assertThat(row.get("geracoes")).isEqualTo(500);
 		assertThat(((Number) row.get("taxa_cruzamento")).doubleValue()).isEqualTo(0.9);
 		assertThat(((Number) row.get("taxa_mutacao")).doubleValue()).isEqualTo(0.4);
 	}
