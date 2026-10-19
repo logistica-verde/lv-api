@@ -4,6 +4,7 @@ import br.com.greenvrp.auth.InactiveUserException;
 import br.com.greenvrp.auth.InvalidCredentialsException;
 import br.com.greenvrp.auth.LastAdministratorException;
 import br.com.greenvrp.blockchain.LedgerException;
+import br.com.greenvrp.execution.ExecutionStateException;
 import br.com.greenvrp.experiment.ExperimentAlreadyRunningException;
 import br.com.greenvrp.geocode.GeocoderUnavailableException;
 import org.springframework.http.HttpStatus;
@@ -46,6 +47,11 @@ public class ApiExceptionHandler {
 
 	@ExceptionHandler(ExperimentAlreadyRunningException.class)
 	public ProblemDetail handleExperimentAlreadyRunning(ExperimentAlreadyRunningException exception) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+	}
+
+	@ExceptionHandler(ExecutionStateException.class)
+	public ProblemDetail handleExecutionState(ExecutionStateException exception) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
 	}
 
