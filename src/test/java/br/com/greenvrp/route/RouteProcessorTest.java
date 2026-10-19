@@ -111,6 +111,25 @@ class RouteProcessorTest {
 	}
 
 	@Test
+	void sendsTheVehicleMassPlusTheCargoToTheOptimizer() {
+		Vehicle vehicle = vehicleRepository.findAll().get(0);
+		List<DeliveryPoint> points = deliveryPointRepository.findAllById(pointIds);
+		Long loadedId = operationRepository
+			.save(Operation.pending(vehicle, OptimizationCriterion.EMISSION, points, 1500.0))
+			.getId();
+		when(optimizerClient.optimize(any())).thenReturn(CompletableFuture.completedFuture(
+			new OptimizeResponse(
+				List.of(0, 1, 2), 5.5, 2010.0,
+				List.of(new SegmentEmission(0, 1, 2.0), new SegmentEmission(1, 2, 3.5)))));
+
+		processor.processAsync(loadedId).join();
+
+		ArgumentCaptor<OptimizeRequest> sent = ArgumentCaptor.forClass(OptimizeRequest.class);
+		verify(optimizerClient).optimize(sent.capture());
+		assertThat(sent.getValue().vehicleMassKg()).isEqualTo(9000.0);
+	}
+
+	@Test
 	void completesOperationAndPersistsOptimizedVisitOrderAndSegments() {
 		OptimizeResponse response = new OptimizeResponse(
 			List.of(1, 0, 2), 5.5, 2010.0,

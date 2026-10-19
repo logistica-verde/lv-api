@@ -53,7 +53,7 @@ public class RouteService {
 			? withoutOrigin(pointIds)
 			: withOrigin(request.origin(), pointIds);
 
-		Operation operation = operationRepository.save(Operation.pending(vehicle, request.criterion(), points));
+		Operation operation = operationRepository.save(Operation.pending(vehicle, request.criterion(), points, request.cargoKg()));
 		routeProcessor.processAsync(operation.getId());
 		return new RouteAcceptedResponse(operation.getId(), operation.getStatus());
 	}

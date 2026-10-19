@@ -18,9 +18,18 @@ public record RouteResponse(
 	Long executionMs,
 	String errorMessage,
 	List<PointItem> points,
-	List<SegmentItem> segments
+	List<SegmentItem> segments,
+	Double cargoKg
 
 ) {
+
+	public RouteResponse(
+		Long id, Long vehicleId, OptimizationCriterion criterion, OperationStatus status, Instant createdAt,
+		Double totalEmissionKg, Double totalDistanceMeters, Long executionMs, String errorMessage,
+		List<PointItem> points, List<SegmentItem> segments) {
+		this(id, vehicleId, criterion, status, createdAt, totalEmissionKg, totalDistanceMeters, executionMs,
+			errorMessage, points, segments, null);
+	}
 
 	public record PointItem(
 		Long pointId,
@@ -89,7 +98,8 @@ public record RouteResponse(
 			operation.getTempoExecucaoMs(),
 			operation.getMensagemErro(),
 			points,
-			segments);
+			segments,
+			operation.getCargaKg());
 	}
 
 }

@@ -83,6 +83,16 @@ class RouteControllerTest {
 	}
 
 	@Test
+	void calculateRejectsANegativeOrAbsurdCargoWeight() throws Exception {
+		for (String cargo : new String[] {"-1", "100001"}) {
+			mockMvc.perform(post("/api/routes/calculate")
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("{\"vehicleId\":1,\"deliveryPointIds\":[10,11],\"criterion\":\"EMISSION\",\"cargoKg\":" + cargo + "}"))
+				.andExpect(status().isBadRequest());
+		}
+	}
+
+	@Test
 	void calculateRejectsSinglePoint() throws Exception {
 		mockMvc.perform(post("/api/routes/calculate")
 				.contentType(MediaType.APPLICATION_JSON)
