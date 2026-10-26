@@ -163,8 +163,14 @@ class ExecutionServiceTest {
 	void cancelsAnOpenExecutionButNotAClosedOne() {
 		ExecutionResponse scheduled = service.create(new ExecutionRequest(completed.getId(), NOW.plusSeconds(600)));
 
-		assertThat(service.cancel(scheduled.id()).status()).isEqualTo(ExecutionStatus.CANCELLED);
-		assertThatThrownBy(() -> service.cancel(scheduled.id())).isInstanceOf(ExecutionStateException.class);
+		ExecutionResponse cancelled = service.cancel(scheduled.id(), "  Cliente pediu para adiar a entrega  ", "ana@lastro.local");
+
+		assertThat(cancelled.status()).isEqualTo(ExecutionStatus.CANCELLED);
+		assertThat(cancelled.cancellationReason()).isEqualTo("Cliente pediu para adiar a entrega");
+		assertThat(cancelled.cancelledBy()).isEqualTo("ana@lastro.local");
+		assertThat(cancelled.finishedAt()).isEqualTo(NOW);
+		assertThatThrownBy(() -> service.cancel(scheduled.id(), "Outro motivo qualquer", "ana@lastro.local"))
+			.isInstanceOf(ExecutionStateException.class);
 	}
 
 	@Test

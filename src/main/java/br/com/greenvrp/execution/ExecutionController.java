@@ -2,6 +2,7 @@ package br.com.greenvrp.execution;
 
 import jakarta.validation.Valid;
 import java.net.URI;
+import java.security.Principal;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -54,8 +55,9 @@ public class ExecutionController {
 	}
 
 	@PostMapping("/{id}/cancel")
-	public ExecutionResponse cancel(@PathVariable Long id) {
-		return executionService.cancel(id);
+	public ExecutionResponse cancel(
+		@PathVariable Long id, @Valid @RequestBody CancelRequest request, Principal principal) {
+		return executionService.cancel(id, request.reason(), principal == null ? null : principal.getName());
 	}
 
 }
