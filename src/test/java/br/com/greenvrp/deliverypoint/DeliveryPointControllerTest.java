@@ -65,4 +65,17 @@ class DeliveryPointControllerTest {
 			.andExpect(jsonPath("$[0].nome").value("Centro"));
 	}
 
+
+	@Test
+	void createRejectsANameOrAnAddressLongerThanTheColumn() throws Exception {
+		mockMvc.perform(post("/api/delivery-points")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"nome\":\"" + "n".repeat(121) + "\",\"latitude\":-23.5,\"longitude\":-46.6}"))
+			.andExpect(status().isBadRequest());
+		mockMvc.perform(post("/api/delivery-points")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"nome\":\"A\",\"endereco\":\"" + "e".repeat(256) + "\",\"latitude\":-23.5,\"longitude\":-46.6}"))
+			.andExpect(status().isBadRequest());
+	}
+
 }
