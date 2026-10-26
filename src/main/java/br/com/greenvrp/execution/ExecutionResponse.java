@@ -19,7 +19,9 @@ public record ExecutionResponse(
 	int pointCount,
 	Double totalEmissionKg,
 	Double totalDistanceMeters,
-	Double cargoKg
+	Double cargoKg,
+	String cancellationReason,
+	String cancelledBy
 
 ) {
 
@@ -39,7 +41,9 @@ public record ExecutionResponse(
 			operation.getPoints().size(),
 			operation.getEmissaoTotalKg(),
 			operation.getDistanciaTotalMetros(),
-			operation.getCargaKg());
+			operation.getCargaKg(),
+			execution.getMotivoCancelamento(),
+			execution.getCanceladaPor());
 	}
 
 }

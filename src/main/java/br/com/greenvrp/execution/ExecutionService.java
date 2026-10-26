@@ -80,9 +80,9 @@ public class ExecutionService {
 	}
 
 	@Transactional
-	public ExecutionResponse cancel(Long id) {
+	public ExecutionResponse cancel(Long id, String reason, String by) {
 		Execution execution = find(id);
-		execution.cancel(clock.instant());
+		execution.cancel(clock.instant(), reason.trim(), by);
 		return ExecutionResponse.from(execution);
 	}
 
