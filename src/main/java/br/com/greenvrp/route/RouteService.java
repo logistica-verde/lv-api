@@ -68,6 +68,25 @@ public class RouteService {
 		return new RouteAcceptedResponse(operation.getId(), operation.getStatus());
 	}
 
+	public Operation createReplanOperation(
+		Vehicle vehicle, OptimizationCriterion criterion, Double cargoKg, RouteRequest.Origin origin,
+		List<Long> pendingPointIds, Base base) {
+		if (!coverageArea.contains(origin.latitude(), origin.longitude())) {
+			throw new InvalidRequestException("The current position is outside the area covered by the road map");
+		}
+		List<DeliveryPoint> points = new ArrayList<>();
+		points.add(originPoint(origin));
+		pendingPointIds.stream()
+			.sorted()
+			.map(deliveryPointRepository::findById)
+			.map(found -> found.orElseThrow(() -> new ResourceNotFoundException("Delivery point not found")))
+			.forEach(points::add);
+		if (base != null) {
+			points.add(base.getPoint());
+		}
+		return operationRepository.save(Operation.pending(vehicle, criterion, points, cargoKg, base));
+	}
+
 	private Base activeBase(Long id) {
 		Base base = baseRepository.findById(id)
 			.orElseThrow(() -> new ResourceNotFoundException("Base %d not found".formatted(id)));

@@ -5,6 +5,9 @@ import br.com.greenvrp.api.ResourceNotFoundException;
 import br.com.greenvrp.route.Operation;
 import br.com.greenvrp.route.OperationRepository;
 import br.com.greenvrp.route.OperationStatus;
+import br.com.greenvrp.route.RouteProcessor;
+import br.com.greenvrp.route.RouteRequest;
+import br.com.greenvrp.route.RouteService;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -12,6 +15,8 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class ExecutionService {
@@ -20,14 +25,20 @@ public class ExecutionService {
 
 	private final ExecutionRepository executionRepository;
 	private final OperationRepository operationRepository;
+	private final RouteService routeService;
+	private final RouteProcessor routeProcessor;
 	private final Clock clock;
 
 	public ExecutionService(
 		ExecutionRepository executionRepository,
 		OperationRepository operationRepository,
+		RouteService routeService,
+		RouteProcessor routeProcessor,
 		@Qualifier("executionClock") Clock clock) {
 		this.executionRepository = executionRepository;
 		this.operationRepository = operationRepository;
+		this.routeService = routeService;
+		this.routeProcessor = routeProcessor;
 		this.clock = clock;
 	}
 
@@ -42,6 +53,10 @@ public class ExecutionService {
 		Execution execution = request.scheduledAt() == null
 			? Execution.startedNow(operation, now)
 			: Execution.scheduled(operation, requireFuture(request.scheduledAt(), now), now);
+		execution.addStops(operation.getPoints().stream()
+			.skip(1)
+			.map(item -> item.getPoint())
+			.toList());
 		return ExecutionResponse.from(executionRepository.save(execution));
 	}
 
@@ -83,6 +98,42 @@ public class ExecutionService {
 	public ExecutionResponse cancel(Long id, String reason, String by) {
 		Execution execution = find(id);
 		execution.cancel(clock.instant(), reason.trim(), by);
+		return ExecutionResponse.from(execution);
+	}
+
+	@Transactional
+	public ExecutionResponse deliverStop(Long id, Long pointId) {
+		Execution execution = find(id);
+		execution.resolveStop(pointId, StopStatus.DELIVERED, null, clock.instant());
+		return ExecutionResponse.from(execution);
+	}
+
+	@Transactional
+	public ExecutionResponse cancelStop(Long id, Long pointId, String reason) {
+		Execution execution = find(id);
+		execution.resolveStop(pointId, StopStatus.CANCELLED, reason.trim(), clock.instant());
+		return ExecutionResponse.from(execution);
+	}
+
+	@Transactional
+	public ExecutionResponse replan(Long id, double latitude, double longitude) {
+		Execution execution = find(id);
+		List<Long> pending = execution.pendingPointIds();
+		if (execution.getStatus() == ExecutionStatus.IN_PROGRESS && pending.isEmpty()) {
+			throw new InvalidRequestException("There are no pending stops to replan");
+		}
+		Operation previous = execution.getOperation();
+		Operation replacement = routeService.createReplanOperation(
+			previous.getVehicle(), previous.getCriterio(), previous.getCargaKg(),
+			new RouteRequest.Origin(latitude, longitude), pending, previous.getBase());
+		execution.startReplan(replacement, clock.instant());
+		Long replacementId = replacement.getId();
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+			@Override
+			public void afterCommit() {
+				routeProcessor.processAsync(replacementId);
+			}
+		});
 		return ExecutionResponse.from(execution);
 	}
 

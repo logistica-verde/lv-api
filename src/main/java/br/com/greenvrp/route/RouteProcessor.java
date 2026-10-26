@@ -28,7 +28,9 @@ import org.locationtech.jts.geom.LineString;
 import org.locationtech.jts.geom.PrecisionModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -53,6 +55,7 @@ public class RouteProcessor {
 	private final GaSettingsService gaSettingsService;
 	private final TransactionTemplate transactions;
 	private final Executor executor;
+	private final ApplicationEventPublisher events;
 
 	public RouteProcessor(
 		OperationRepository operationRepository,
@@ -61,7 +64,22 @@ public class RouteProcessor {
 		BlockchainService blockchainService,
 		GaSettingsService gaSettingsService,
 		PlatformTransactionManager transactionManager,
-		@Qualifier("routeExecutor") Executor executor) {
+		Executor executor) {
+		this(operationRepository, pairSegmentSource, optimizerClient, blockchainService, gaSettingsService,
+			transactionManager, executor, event -> { });
+	}
+
+	@Autowired
+	public RouteProcessor(
+		OperationRepository operationRepository,
+		PairSegmentSource pairSegmentSource,
+		OptimizerClient optimizerClient,
+		BlockchainService blockchainService,
+		GaSettingsService gaSettingsService,
+		PlatformTransactionManager transactionManager,
+		@Qualifier("routeExecutor") Executor executor,
+		ApplicationEventPublisher events) {
+		this.events = events;
 		this.operationRepository = operationRepository;
 		this.pairSegmentSource = pairSegmentSource;
 		this.optimizerClient = optimizerClient;
@@ -80,11 +98,13 @@ public class RouteProcessor {
 			})
 			.thenApply(done -> true)
 			.exceptionally(error -> {
-				markFailed(operationId, error);
+				String failure = markFailed(operationId, error);
+				publish(new OperationSettledEvent(operationId, false, failure));
 				return false;
 			})
 			.thenAcceptAsync(completed -> {
 				if (completed) {
+					publish(new OperationSettledEvent(operationId, true, null));
 					blockchainService.anchorOperation(operationId);
 				}
 			}, executor);
@@ -100,7 +120,8 @@ public class RouteProcessor {
 				settings.populationSize(), settings.generations(), settings.crossoverRate(), settings.mutationRate());
 			OptimizeRequest request = OptimizeRequest.of(
 				operation.getCriterio(), operation.getMassaTotalKg(), points.size(), pairs, gaParams,
-				seedOf(points.stream().map(DeliveryPoint::getId).toList()), operation.isRetornaBase());
+				seedOf(points.stream().map(DeliveryPoint::getId).toList()),
+				closesAtStart(operation, points), endsAtBase(operation, points) ? points.size() - 1 : null);
 			return new Prepared(request, pairs);
 		});
 	}
@@ -122,7 +143,7 @@ public class RouteProcessor {
 			Operation operation = loadOperation(operationId);
 			List<DeliveryPoint> points = pointsOf(operation);
 			List<Integer> sequence = response.sequence();
-			List<Integer> visits = operation.isRetornaBase() ? withoutReturn(sequence, points.size()) : sequence;
+			List<Integer> visits = closesAtStart(operation, points) ? withoutReturn(sequence, points.size()) : sequence;
 			validateSequence(visits, points.size());
 
 			List<RouteSegment> legs = buildLegs(
@@ -169,6 +190,15 @@ public class RouteProcessor {
 			.toList();
 	}
 
+	private static boolean closesAtStart(Operation operation, List<DeliveryPoint> points) {
+		return operation.isRetornaBase() && operation.getBase() != null
+			&& operation.getBase().getPoint().getId().equals(points.get(0).getId());
+	}
+
+	private static boolean endsAtBase(Operation operation, List<DeliveryPoint> points) {
+		return operation.isRetornaBase() && !closesAtStart(operation, points);
+	}
+
 	private static List<Integer> withoutReturn(List<Integer> sequence, int pointCount) {
 		boolean closed = sequence != null && sequence.size() == pointCount + 1
 			&& sequence.get(0) == 0 && sequence.get(pointCount) == 0;
@@ -183,7 +213,16 @@ public class RouteProcessor {
 		}
 	}
 
-	private void markFailed(Long operationId, Throwable error) {
+	private void publish(OperationSettledEvent event) {
+		try {
+			events.publishEvent(event);
+		}
+		catch (RuntimeException listenerFailure) {
+			log.error("A listener failed for operation {}", event.operationId(), listenerFailure);
+		}
+	}
+
+	private String markFailed(Long operationId, Throwable error) {
 		Throwable root = unwrap(error);
 		String message = String.valueOf(root.getMessage());
 		if (message.length() > MAX_ERROR_LENGTH) {
@@ -197,6 +236,7 @@ public class RouteProcessor {
 		catch (RuntimeException persistenceError) {
 			log.error("Could not record failure of route operation {}", operationId, persistenceError);
 		}
+		return persistedMessage;
 	}
 
 	private Throwable unwrap(Throwable error) {

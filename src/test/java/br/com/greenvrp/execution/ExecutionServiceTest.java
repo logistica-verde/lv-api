@@ -10,6 +10,8 @@ import br.com.greenvrp.deliverypoint.DeliveryPointRepository;
 import br.com.greenvrp.optimizer.OptimizationCriterion;
 import br.com.greenvrp.route.Operation;
 import br.com.greenvrp.route.OperationRepository;
+import br.com.greenvrp.route.RouteProcessor;
+import br.com.greenvrp.route.RouteService;
 import br.com.greenvrp.vehicle.Vehicle;
 import br.com.greenvrp.vehicle.VehicleRepository;
 import java.time.Clock;
@@ -23,6 +25,7 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @DataJpaTest
 @Import({ExecutionService.class, ExecutionServiceTest.FixedClock.class})
@@ -39,6 +42,12 @@ class ExecutionServiceTest {
 		}
 
 	}
+
+	@MockitoBean
+	private RouteService routeService;
+
+	@MockitoBean
+	private RouteProcessor routeProcessor;
 
 	@Autowired
 	private ExecutionService service;
