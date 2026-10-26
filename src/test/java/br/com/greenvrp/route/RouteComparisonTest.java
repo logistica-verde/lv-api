@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 
 import br.com.greenvrp.api.InvalidRequestException;
 import br.com.greenvrp.api.ResourceNotFoundException;
+import br.com.greenvrp.base.BaseRepository;
 import br.com.greenvrp.deliverypoint.DeliveryPoint;
 import br.com.greenvrp.geo.CoverageArea;
 import br.com.greenvrp.deliverypoint.DeliveryPointRepository;
@@ -30,6 +31,9 @@ class RouteComparisonTest {
 	@Autowired
 	private DeliveryPointRepository deliveryPointRepository;
 
+	@Autowired
+	private BaseRepository baseRepository;
+
 	private RouteService service;
 	private Vehicle vehicle;
 	private List<DeliveryPoint> points;
@@ -37,7 +41,7 @@ class RouteComparisonTest {
 	@BeforeEach
 	void setUp() {
 		service = new RouteService(vehicleRepository, deliveryPointRepository, operationRepository, mock(RouteProcessor.class),
-			new CoverageArea(""));
+			new CoverageArea(""), baseRepository);
 		vehicle = vehicleRepository.save(new Vehicle("ABC1D23", 7500.0, "diesel"));
 		points = List.of(
 			deliveryPointRepository.save(new DeliveryPoint("P1", null, -23.55, -46.63)),

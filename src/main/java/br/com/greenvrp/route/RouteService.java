@@ -2,6 +2,8 @@ package br.com.greenvrp.route;
 
 import br.com.greenvrp.api.InvalidRequestException;
 import br.com.greenvrp.api.ResourceNotFoundException;
+import br.com.greenvrp.base.Base;
+import br.com.greenvrp.base.BaseRepository;
 import br.com.greenvrp.deliverypoint.DeliveryPoint;
 import br.com.greenvrp.deliverypoint.DeliveryPointRepository;
 import br.com.greenvrp.vehicle.Vehicle;
@@ -29,13 +31,16 @@ public class RouteService {
 	private final OperationRepository operationRepository;
 	private final RouteProcessor routeProcessor;
 	private final CoverageArea coverageArea;
+	private final BaseRepository baseRepository;
 
 	public RouteService(
 		VehicleRepository vehicleRepository,
 		DeliveryPointRepository deliveryPointRepository,
 		OperationRepository operationRepository,
 		RouteProcessor routeProcessor,
-		CoverageArea coverageArea) {
+		CoverageArea coverageArea,
+		BaseRepository baseRepository) {
+		this.baseRepository = baseRepository;
 		this.vehicleRepository = vehicleRepository;
 		this.deliveryPointRepository = deliveryPointRepository;
 		this.operationRepository = operationRepository;
@@ -49,13 +54,38 @@ public class RouteService {
 			throw new InvalidRequestException("deliveryPointIds must not contain duplicates");
 		}
 		Vehicle vehicle = activeVehicle(request.vehicleId());
-		List<DeliveryPoint> points = request.origin() == null
-			? withoutOrigin(pointIds)
-			: withOrigin(request.origin(), pointIds);
+		if (request.baseId() != null && request.origin() != null) {
+			throw new InvalidRequestException("Inform either a base or an origin, not both");
+		}
+		Base base = request.baseId() == null ? null : activeBase(request.baseId());
+		List<DeliveryPoint> points = base != null
+			? fromBase(base, pointIds)
+			: request.origin() == null ? withoutOrigin(pointIds) : withOrigin(request.origin(), pointIds);
 
-		Operation operation = operationRepository.save(Operation.pending(vehicle, request.criterion(), points, request.cargoKg()));
+		Operation operation = operationRepository.save(
+			Operation.pending(vehicle, request.criterion(), points, request.cargoKg(), base));
 		routeProcessor.processAsync(operation.getId());
 		return new RouteAcceptedResponse(operation.getId(), operation.getStatus());
+	}
+
+	private Base activeBase(Long id) {
+		Base base = baseRepository.findById(id)
+			.orElseThrow(() -> new ResourceNotFoundException("Base %d not found".formatted(id)));
+		if (!base.isAtivo()) {
+			throw new InvalidRequestException("Base %d is inactive".formatted(id));
+		}
+		return base;
+	}
+
+	private List<DeliveryPoint> fromBase(Base base, List<Long> pointIds) {
+		List<DeliveryPoint> stops = pointIds.stream()
+			.map(this::activePoint)
+			.sorted(Comparator.comparing(DeliveryPoint::getId))
+			.toList();
+		List<DeliveryPoint> points = new ArrayList<>();
+		points.add(base.getPoint());
+		points.addAll(stops);
+		return points;
 	}
 
 	private List<DeliveryPoint> withoutOrigin(List<Long> pointIds) {

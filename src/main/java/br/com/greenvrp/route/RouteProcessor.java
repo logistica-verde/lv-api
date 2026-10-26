@@ -100,7 +100,7 @@ public class RouteProcessor {
 				settings.populationSize(), settings.generations(), settings.crossoverRate(), settings.mutationRate());
 			OptimizeRequest request = OptimizeRequest.of(
 				operation.getCriterio(), operation.getMassaTotalKg(), points.size(), pairs, gaParams,
-				seedOf(points.stream().map(DeliveryPoint::getId).toList()));
+				seedOf(points.stream().map(DeliveryPoint::getId).toList()), operation.isRetornaBase());
 			return new Prepared(request, pairs);
 		});
 	}
@@ -122,11 +122,12 @@ public class RouteProcessor {
 			Operation operation = loadOperation(operationId);
 			List<DeliveryPoint> points = pointsOf(operation);
 			List<Integer> sequence = response.sequence();
-			validateSequence(sequence, points.size());
+			List<Integer> visits = operation.isRetornaBase() ? withoutReturn(sequence, points.size()) : sequence;
+			validateSequence(visits, points.size());
 
 			List<RouteSegment> legs = buildLegs(
 				operation, points, sequence, pairsByLeg(prepared.pairs()), emissionsByLeg(response));
-			operation.complete(response.totalEmissionKg(), sequence, legs);
+			operation.complete(response.totalEmissionKg(), visits, legs);
 			operation.registrarTempoExecucao(executionMillis);
 		});
 	}
@@ -166,6 +167,12 @@ public class RouteProcessor {
 					pair.averageSpeedKmh(), pair.slopePercent(), emission, pair.distanceMeters());
 			})
 			.toList();
+	}
+
+	private static List<Integer> withoutReturn(List<Integer> sequence, int pointCount) {
+		boolean closed = sequence != null && sequence.size() == pointCount + 1
+			&& sequence.get(0) == 0 && sequence.get(pointCount) == 0;
+		return closed ? sequence.subList(0, pointCount) : sequence;
 	}
 
 	private void validateSequence(List<Integer> sequence, int pointCount) {

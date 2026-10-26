@@ -1,5 +1,6 @@
 package br.com.greenvrp.route;
 
+import br.com.greenvrp.base.Base;
 import br.com.greenvrp.deliverypoint.DeliveryPoint;
 import br.com.greenvrp.optimizer.OptimizationCriterion;
 import br.com.greenvrp.vehicle.Vehicle;
@@ -61,6 +62,13 @@ public class Operation {
 	@Column(name = "carga_kg")
 	private Double cargaKg;
 
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "id_base")
+	private Base base;
+
+	@Column(name = "retorna_base", nullable = false)
+	private boolean retornaBase;
+
 	@OneToMany(mappedBy = "operation", cascade = CascadeType.ALL, orphanRemoval = true)
 	@OrderBy("ordemVisita ASC")
 	private List<OperationPoint> points = new ArrayList<>();
@@ -78,12 +86,19 @@ public class Operation {
 
 	public static Operation pending(
 		Vehicle vehicle, OptimizationCriterion criterion, List<DeliveryPoint> points, Double cargoKg) {
+		return pending(vehicle, criterion, points, cargoKg, null);
+	}
+
+	public static Operation pending(
+		Vehicle vehicle, OptimizationCriterion criterion, List<DeliveryPoint> points, Double cargoKg, Base base) {
 		Operation operation = new Operation();
 		operation.vehicle = vehicle;
 		operation.criterio = criterion;
 		operation.dataHora = Instant.now().truncatedTo(ChronoUnit.MILLIS);
 		operation.status = OperationStatus.PENDING;
 		operation.cargaKg = cargoKg == null || cargoKg <= 0 ? null : cargoKg;
+		operation.base = base;
+		operation.retornaBase = base != null;
 		for (int index = 0; index < points.size(); index++) {
 			operation.points.add(new OperationPoint(operation, points.get(index), index + 1));
 		}
@@ -113,6 +128,14 @@ public class Operation {
 
 	public Double getCargaKg() {
 		return cargaKg;
+	}
+
+	public Base getBase() {
+		return base;
+	}
+
+	public boolean isRetornaBase() {
+		return retornaBase;
 	}
 
 	public double getMassaTotalKg() {
