@@ -41,15 +41,23 @@ public class BlockchainService {
 	public void anchorOperation(Long operationId) {
 		try {
 			Optional<BlockchainRecord> existing = recordRepository.findByOperationId(operationId);
-			if (existing.map(record -> record.getStatus() == AnchorStatus.ANCHORED).orElse(false)) {
-				log.warn("Operation {} already has a blockchain record; skipping", operationId);
+			if (existing.map(record -> record.getStatus() != AnchorStatus.FAILED).orElse(false)) {
+				log.warn("Operation {} already has a {} blockchain record; skipping", operationId, existing.get().getStatus());
 				return;
 			}
 			String hash = transactions.execute(status -> hashGenerator.hash(loadOperation(operationId)));
 			try {
-				if (isAlreadyOnLedger(operationId, hash)) {
+				Optional<String> onLedger = readLedger(operationId);
+				if (onLedger.isPresent() && onLedger.get().equalsIgnoreCase(hash)) {
 					log.info("Operation {} is already on the ledger with the same hash; recovering the record", operationId);
 					settle(operationId, hash, AnchorAttemptResult.RECOVERED, null, null, null);
+					return;
+				}
+				if (onLedger.isPresent()) {
+					log.error("Operation {} diverges from the ledger: the ledger holds {} but the database hashes to {}",
+						operationId, onLedger.get(), hash);
+					settle(operationId, hash, AnchorAttemptResult.DIVERGENT, null, null,
+						"The ledger already holds a different hash for this operation: " + onLedger.get());
 					return;
 				}
 				AnchorReceipt receipt = ledger.anchor(operationId, hash);
@@ -74,12 +82,12 @@ public class BlockchainService {
 		return operationIds.size();
 	}
 
-	private boolean isAlreadyOnLedger(Long operationId, String hash) {
+	private Optional<String> readLedger(Long operationId) {
 		try {
-			return ledger.readHash(operationId).filter(hash::equalsIgnoreCase).isPresent();
+			return ledger.readHash(operationId);
 		}
 		catch (LedgerException unreachable) {
-			return false;
+			return Optional.empty();
 		}
 	}
 
@@ -88,23 +96,14 @@ public class BlockchainService {
 		transactions.executeWithoutResult(status -> {
 			int number = attemptRepository.countByOperationId(operationId) + 1;
 			attemptRepository.save(new AnchorAttempt(operationId, number, result, txHash, message));
-			boolean failed = result == AnchorAttemptResult.FAILED;
-			Optional<BlockchainRecord> existing = recordRepository.findByOperationId(operationId);
-			if (existing.isPresent()) {
-				if (failed) {
-					existing.get().markFailed(hash, message);
-				}
-				else {
-					existing.get().markAnchored(hash, txHash, blockNumber);
-				}
-				return;
+			BlockchainRecord record = recordRepository.findByOperationId(operationId)
+				.orElseGet(() -> recordRepository.save(
+					BlockchainRecord.failed(operationRepository.getReferenceById(operationId), hash, message)));
+			switch (result) {
+				case ANCHORED, RECOVERED -> record.markAnchored(hash, txHash, blockNumber);
+				case DIVERGENT -> record.markDivergent(hash, message);
+				case FAILED -> record.markFailed(hash, message);
 			}
-			Operation operation = operationRepository.getReferenceById(operationId);
-			BlockchainRecord created = BlockchainRecord.failed(operation, hash, message);
-			if (!failed) {
-				created.markAnchored(hash, txHash, blockNumber);
-			}
-			recordRepository.save(created);
 		});
 	}
 

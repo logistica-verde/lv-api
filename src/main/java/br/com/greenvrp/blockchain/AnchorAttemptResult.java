@@ -4,6 +4,7 @@ public enum AnchorAttemptResult {
 
 	ANCHORED,
 	RECOVERED,
-	FAILED
+	FAILED,
+	DIVERGENT
 
 }

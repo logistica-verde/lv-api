@@ -8,6 +8,11 @@ CREATE TABLE tentativas_ancoragem (
     data_hora datetimeoffset NOT NULL,
     CONSTRAINT pk_tentativas_ancoragem PRIMARY KEY (id),
     CONSTRAINT uq_tentativas_ancoragem_numero UNIQUE (id_operacao, numero),
-    CONSTRAINT ck_tentativas_ancoragem_resultado CHECK (resultado IN ('ANCHORED', 'RECOVERED', 'FAILED')),
+    CONSTRAINT ck_tentativas_ancoragem_resultado CHECK (resultado IN ('ANCHORED', 'RECOVERED', 'FAILED', 'DIVERGENT')),
     CONSTRAINT fk_tentativas_ancoragem_operacao FOREIGN KEY (id_operacao) REFERENCES operacoes (id)
 );
+
+ALTER TABLE registros_blockchain DROP CONSTRAINT ck_registros_blockchain_status;
+
+ALTER TABLE registros_blockchain ADD CONSTRAINT ck_registros_blockchain_status
+    CHECK (status_integridade IN ('ANCHORED', 'FAILED', 'DIVERGENT'));

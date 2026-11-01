@@ -144,6 +144,36 @@ class BlockchainServiceTest {
 	}
 
 	@Test
+	void flagsADivergenceInsteadOfResendingWhenTheLedgerHoldsAnotherHash() {
+		String foreignHash = "ab".repeat(32);
+		ledger.anchor(operationId, foreignHash);
+
+		service.anchorOperation(operationId);
+
+		BlockchainRecord record = recordRepository.findByOperationId(operationId).orElseThrow();
+		assertThat(record.getStatus()).isEqualTo(AnchorStatus.DIVERGENT);
+		assertThat(record.getHashSha256()).isEqualTo(currentHash());
+		assertThat(record.getMensagemErro()).contains(foreignHash);
+		assertThat(ledger.readHash(operationId)).contains(foreignHash);
+		assertThat(attemptRepository.findByOperationIdOrderByNumberAsc(operationId))
+			.extracting(AnchorAttempt::getResult)
+			.containsExactly(AnchorAttemptResult.DIVERGENT);
+	}
+
+	@Test
+	void neverRetriesOrReanchorsADivergentOperation() {
+		ledger.anchor(operationId, "ab".repeat(32));
+		service.anchorOperation(operationId);
+
+		assertThat(service.retryFailed()).isZero();
+		service.anchorOperation(operationId);
+
+		assertThat(attemptRepository.countByOperationId(operationId)).isEqualTo(1);
+		assertThat(recordRepository.findByOperationId(operationId).orElseThrow().getStatus())
+			.isEqualTo(AnchorStatus.DIVERGENT);
+	}
+
+	@Test
 	void doesNotRetryAnAnchorThatSucceeded() {
 		service.anchorOperation(operationId);
 

@@ -84,6 +84,13 @@ public class BlockchainRecord {
 		this.timestampRegistro = Instant.now();
 	}
 
+	public void markDivergent(String hashSha256, String message) {
+		this.hashSha256 = hashSha256;
+		this.status = AnchorStatus.DIVERGENT;
+		this.mensagemErro = message;
+		this.timestampRegistro = Instant.now();
+	}
+
 	public Operation getOperation() {
 		return operation;
 	}
