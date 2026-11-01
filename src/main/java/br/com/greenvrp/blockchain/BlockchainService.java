@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -22,6 +23,7 @@ public class BlockchainService {
 	private final HashGenerator hashGenerator;
 	private final Ledger ledger;
 	private final TransactionTemplate transactions;
+	private final int maxAttempts;
 
 	public BlockchainService(
 		OperationRepository operationRepository,
@@ -29,13 +31,15 @@ public class BlockchainService {
 		AnchorAttemptRepository attemptRepository,
 		HashGenerator hashGenerator,
 		Ledger ledger,
-		PlatformTransactionManager transactionManager) {
+		PlatformTransactionManager transactionManager,
+		@Value("${blockchain.retry.max-attempts:5}") int maxAttempts) {
 		this.operationRepository = operationRepository;
 		this.recordRepository = recordRepository;
 		this.attemptRepository = attemptRepository;
 		this.hashGenerator = hashGenerator;
 		this.ledger = ledger;
 		this.transactions = new TransactionTemplate(transactionManager);
+		this.maxAttempts = maxAttempts;
 	}
 
 	public void anchorOperation(Long operationId) {
@@ -108,8 +112,17 @@ public class BlockchainService {
 			switch (result) {
 				case ANCHORED, RECOVERED -> record.markAnchored(hash, txHash, blockNumber);
 				case DIVERGENT -> record.markDivergent(hash, message);
-				case FAILED -> record.markFailed(hash, message);
+				case FAILED -> {
+					if (number >= maxAttempts) {
+						log.error("Operation {} failed to anchor {} times; giving up until someone reviews it", operationId, number);
+						record.markExhausted(hash, message);
+					}
+					else {
+						record.markFailed(hash, message);
+					}
+				}
 			}
+			record.recordProvenance(ledger.contractAddress(), HashGenerator.SERIALIZATION_VERSION);
 		});
 	}
 

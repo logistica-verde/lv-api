@@ -10,6 +10,7 @@ import br.com.greenvrp.vehicle.Vehicle;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.TimeZone;
 import org.junit.jupiter.api.Test;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
@@ -106,6 +107,25 @@ class HashGeneratorTest {
 		assertThat(generator.hash(operation(5.5, 1011.0, List.of(2, 0, 1), 1L))).isNotEqualTo(original);
 		assertThat(generator.hash(operation(5.5, 1010.0, List.of(2, 1, 0), 1L))).isNotEqualTo(original);
 		assertThat(generator.hash(operation(5.5, 1010.0, List.of(2, 0, 1), 2L))).isNotEqualTo(original);
+	}
+
+	@Test
+	void producesTheSameHashWhateverTheTimeZoneOfTheServer() {
+		TimeZone original = TimeZone.getDefault();
+		try {
+			TimeZone.setDefault(TimeZone.getTimeZone("America/Sao_Paulo"));
+			String inSaoPaulo = generator.canonicalJson(baseline());
+			TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
+			String inUtc = generator.canonicalJson(baseline());
+			TimeZone.setDefault(TimeZone.getTimeZone("Asia/Tokyo"));
+			String inTokyo = generator.canonicalJson(baseline());
+
+			assertThat(inSaoPaulo).isEqualTo(inUtc).isEqualTo(inTokyo);
+			assertThat(inUtc).containsPattern("\"createdAt\":\"[0-9T:.\\-]+Z\"");
+		}
+		finally {
+			TimeZone.setDefault(original);
+		}
 	}
 
 	@Test

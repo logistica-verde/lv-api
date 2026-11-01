@@ -4,6 +4,7 @@ public enum AnchorStatus {
 
 	ANCHORED,
 	FAILED,
-	DIVERGENT
+	DIVERGENT,
+	EXHAUSTED
 
 }

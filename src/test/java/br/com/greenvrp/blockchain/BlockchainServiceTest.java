@@ -24,6 +24,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class BlockchainServiceTest {
 
+	private static final int MAX_ATTEMPTS = 3;
+
 	@Autowired
 	private OperationRepository operationRepository;
 
@@ -49,7 +51,8 @@ class BlockchainServiceTest {
 
 	@BeforeEach
 	void setUp() {
-		service = new BlockchainService(operationRepository, recordRepository, attemptRepository, hashGenerator, ledger, transactionManager);
+		service = new BlockchainService(
+			operationRepository, recordRepository, attemptRepository, hashGenerator, ledger, transactionManager, MAX_ATTEMPTS);
 		Vehicle vehicle = vehicleRepository.save(new Vehicle("ABC1D23", 7500.0, "diesel"));
 		List<DeliveryPoint> points = List.of(
 			deliveryPointRepository.save(new DeliveryPoint("A", null, -23.55, -46.63)),
@@ -84,6 +87,36 @@ class BlockchainServiceTest {
 		assertThat(record.getBlocoLedger()).isEqualTo(101L);
 		assertThat(record.getMensagemErro()).isNull();
 		assertThat(ledger.readHash(operationId)).contains(currentHash());
+	}
+
+	@Test
+	void recordsTheContractAndTheSerializationVersionOfEveryRecord() {
+		ledger.failWith(new LedgerException("Besu is down"));
+		service.anchorOperation(operationId);
+		BlockchainRecord failed = recordRepository.findByOperationId(operationId).orElseThrow();
+		ledger.recover();
+		service.retryFailed();
+
+		BlockchainRecord anchored = recordRepository.findByOperationId(operationId).orElseThrow();
+		assertThat(failed.getEnderecoContrato()).isEqualTo(InMemoryLedger.CONTRACT_ADDRESS);
+		assertThat(anchored.getEnderecoContrato()).isEqualTo(InMemoryLedger.CONTRACT_ADDRESS);
+		assertThat(anchored.getVersaoSerializacao()).isEqualTo(1);
+	}
+
+	@Test
+	void givesUpAfterTheMaximumNumberOfAttemptsAndStopsRetrying() {
+		ledger.failWith(new LedgerException("Besu is down"));
+		service.anchorOperation(operationId);
+		service.retryFailed();
+		service.retryFailed();
+
+		assertThat(recordRepository.findByOperationId(operationId).orElseThrow().getStatus())
+			.isEqualTo(AnchorStatus.EXHAUSTED);
+		ledger.recover();
+		assertThat(service.retryFailed()).isZero();
+		service.anchorOperation(operationId);
+		assertThat(attemptRepository.countByOperationId(operationId)).isEqualTo(MAX_ATTEMPTS);
+		assertThat(ledger.readHash(operationId)).isEmpty();
 	}
 
 	@Test

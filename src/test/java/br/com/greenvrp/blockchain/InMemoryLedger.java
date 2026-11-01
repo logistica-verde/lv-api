@@ -7,6 +7,8 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class InMemoryLedger implements Ledger {
 
+	public static final String CONTRACT_ADDRESS = "0x00000000000000000000000000000000000000aa";
+
 	private final Map<Long, String> hashes = new ConcurrentHashMap<>();
 	private final AtomicLong blockCounter = new AtomicLong(100);
 	private volatile RuntimeException failure;
@@ -24,6 +26,11 @@ public class InMemoryLedger implements Ledger {
 	public Optional<String> readHash(long operationId) {
 		failIfRequested();
 		return Optional.ofNullable(hashes.get(operationId));
+	}
+
+	@Override
+	public String contractAddress() {
+		return CONTRACT_ADDRESS;
 	}
 
 	public void failWith(RuntimeException exception) {

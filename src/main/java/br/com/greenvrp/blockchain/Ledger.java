@@ -8,4 +8,6 @@ public interface Ledger {
 
 	Optional<String> readHash(long operationId);
 
+	String contractAddress();
+
 }

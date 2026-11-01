@@ -4,6 +4,7 @@ public enum IntegrityStatus {
 
 	VALID,
 	TAMPERED,
-	NOT_ANCHORED
+	NOT_ANCHORED,
+	ANCHOR_FAILED
 
 }

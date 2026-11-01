@@ -1,6 +1,7 @@
 package br.com.greenvrp.route;
 
 import br.com.greenvrp.api.InvalidRequestException;
+import br.com.greenvrp.blockchain.AnchorStatus;
 import br.com.greenvrp.blockchain.BlockchainRecordRepository;
 import br.com.greenvrp.blockchain.IntegrityStatus;
 import br.com.greenvrp.blockchain.IntegrityVerifier;
@@ -126,12 +127,17 @@ public class OperationHistoryService {
 		if (rows.isEmpty()) {
 			return List.of();
 		}
-		Set<Long> anchored = new HashSet<>(
-			recordRepository.findAnchoredOperationIds(rows.stream().map(Row::id).toList()));
+		List<Long> ids = rows.stream().map(Row::id).toList();
+		Set<Long> onLedger = new HashSet<>(
+			recordRepository.findOperationIdsWithStatus(ids, List.of(AnchorStatus.ANCHORED, AnchorStatus.DIVERGENT)));
+		Set<Long> gaveUp = new HashSet<>(recordRepository.findOperationIdsWithStatus(ids, List.of(AnchorStatus.EXHAUSTED)));
 		return rows.stream()
-			.map(row -> anchored.contains(row.id())
-				? integrityVerifier.verify(row.id()).status()
-				: IntegrityStatus.NOT_ANCHORED)
+			.map(row -> {
+				if (onLedger.contains(row.id())) {
+					return integrityVerifier.verify(row.id()).status();
+				}
+				return gaveUp.contains(row.id()) ? IntegrityStatus.ANCHOR_FAILED : IntegrityStatus.NOT_ANCHORED;
+			})
 			.toList();
 	}
 
