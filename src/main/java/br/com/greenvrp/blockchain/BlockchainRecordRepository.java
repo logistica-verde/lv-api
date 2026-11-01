@@ -11,6 +11,8 @@ public interface BlockchainRecordRepository extends JpaRepository<BlockchainReco
 
 	Optional<BlockchainRecord> findByOperationId(Long operationId);
 
+	List<BlockchainRecord> findByStatus(AnchorStatus status);
+
 	@Query("select r.operation.id from BlockchainRecord r "
 		+ "where r.operation.id in :ids and r.status = br.com.greenvrp.blockchain.AnchorStatus.ANCHORED")
 	List<Long> findAnchoredOperationIds(@Param("ids") Collection<Long> ids);
