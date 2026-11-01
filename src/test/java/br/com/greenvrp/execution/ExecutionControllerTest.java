@@ -34,7 +34,7 @@ class ExecutionControllerTest {
 	private ExecutionResponse response(ExecutionStatus status) {
 		return new ExecutionResponse(
 			5L, status, Instant.parse("2026-10-20T15:00:00Z"), Instant.parse("2026-10-20T12:00:00Z"), null, null,
-			7L, OptimizationCriterion.EMISSION, 1L, "ABC1D23", 3, 5.5, 2022.5, 800.0);
+			7L, OptimizationCriterion.EMISSION, 1L, "ABC1D23", 3, 5.5, 2022.5, 800.0, null, null);
 	}
 
 	@Test
@@ -112,6 +112,31 @@ class ExecutionControllerTest {
 		given(executionService.get(9L)).willThrow(new ResourceNotFoundException("Execution 9 not found"));
 
 		mockMvc.perform(get("/api/executions/9")).andExpect(status().isNotFound());
+	}
+
+
+	@Test
+	@WithMockUser(username = "ana@lastro.local", roles = "OPERATOR")
+	void cancelPassesTheReasonAndWhoCancelled() throws Exception {
+		given(executionService.cancel(5L, "Veículo com problema mecânico", "ana@lastro.local"))
+			.willReturn(response(ExecutionStatus.CANCELLED));
+
+		mockMvc.perform(post("/api/executions/5/cancel")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"reason\":\"Veículo com problema mecânico\"}"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status").value("CANCELLED"));
+	}
+
+	@Test
+	@WithMockUser(roles = "OPERATOR")
+	void cancelRequiresAReasonOfAtLeastTenCharacters() throws Exception {
+		for (String body : new String[] {"{}", "{\"reason\":\"\"}", "{\"reason\":\"curto\"}", "{\"reason\":\"" + "x".repeat(501) + "\"}"}) {
+			mockMvc.perform(post("/api/executions/5/cancel")
+					.contentType(MediaType.APPLICATION_JSON)
+					.content(body))
+				.andExpect(status().isBadRequest());
+		}
 	}
 
 }

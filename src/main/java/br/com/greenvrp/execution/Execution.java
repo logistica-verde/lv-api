@@ -43,6 +43,12 @@ public class Execution {
 	@Column(name = "finalizada_em")
 	private Instant finalizadaEm;
 
+	@Column(name = "motivo_cancelamento", length = 500)
+	private String motivoCancelamento;
+
+	@Column(name = "cancelada_por", length = 150)
+	private String canceladaPor;
+
 	protected Execution() {
 	}
 
@@ -81,12 +87,14 @@ public class Execution {
 		this.finalizadaEm = truncated(now);
 	}
 
-	public void cancel(Instant now) {
+	public void cancel(Instant now, String reason, String by) {
 		if (status != ExecutionStatus.SCHEDULED && status != ExecutionStatus.IN_PROGRESS) {
 			throw new ExecutionStateException("The execution is already " + status.name().toLowerCase());
 		}
 		this.status = ExecutionStatus.CANCELLED;
 		this.finalizadaEm = truncated(now);
+		this.motivoCancelamento = reason;
+		this.canceladaPor = by;
 	}
 
 	private void requireStatus(ExecutionStatus expected, String message) {
@@ -125,6 +133,14 @@ public class Execution {
 
 	public Instant getFinalizadaEm() {
 		return finalizadaEm;
+	}
+
+	public String getMotivoCancelamento() {
+		return motivoCancelamento;
+	}
+
+	public String getCanceladaPor() {
+		return canceladaPor;
 	}
 
 }
