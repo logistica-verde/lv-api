@@ -27,4 +27,13 @@ class DistanceCalculatorTest {
 		assertThat(ab).isCloseTo(ba, within(1e-6));
 	}
 
+	@Test
+	void matchesTheGeodesicDistanceSqlServerReportsBetweenPracaDaSeAndMasp() {
+		double sqlServerGeographyMeters = 2_604.13;
+
+		double meters = DistanceCalculator.haversineMeters(-23.5505, -46.6333, -23.5614, -46.6559);
+
+		assertThat(meters).isCloseTo(sqlServerGeographyMeters, within(sqlServerGeographyMeters * 0.005));
+	}
+
 }

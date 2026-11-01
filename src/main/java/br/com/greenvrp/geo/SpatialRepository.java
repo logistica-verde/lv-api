@@ -9,7 +9,8 @@ public interface SpatialRepository extends JpaRepository<RoadSegment, Long> {
 
 	@Query(
 		value = "SELECT TOP 1 * FROM malha_viaria "
-			+ "ORDER BY geom.STDistance(geometry::STGeomFromText(:wkt, 4326)) ASC",
+			+ "ORDER BY geography::STGeomFromWKB(geom.STAsBinary(), 4326)"
+			+ ".STDistance(geography::STGeomFromText(:wkt, 4326)) ASC",
 		nativeQuery = true)
 	Optional<RoadSegment> findNearestSegment(@Param("wkt") String wkt);
 
