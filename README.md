@@ -96,6 +96,8 @@ O schema e versionado com Flyway em `src/main/resources/db/migration` (arquivos 
 
 O contrato ja vem compilado em `src/main/resources/contracts/AuditRegistry.bin` (e o ABI em `AuditRegistry.abi`), gerado com o solc 0.8.28. Um teste confere que o bytecode atende as funcoes que o `BesuLedger` chama.
 
+So a conta que implantou o contrato (`owner`) consegue gravar: `anchor` reverte com `not the owner` para qualquer outra conta, e reverte com `already anchored` se a operacao ja tiver um hash. Por isso o contrato deve ser implantado com a mesma `BESU_PRIVATE_KEY` que a API usa.
+
 ### Implantar o contrato
 
 Com o no Besu no ar e uma conta com fundos (ou com `BESU_GAS_PRICE=0`, o padrao), rode:

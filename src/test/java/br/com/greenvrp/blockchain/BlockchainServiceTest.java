@@ -153,11 +153,31 @@ class BlockchainServiceTest {
 		BlockchainRecord record = recordRepository.findByOperationId(operationId).orElseThrow();
 		assertThat(record.getStatus()).isEqualTo(AnchorStatus.DIVERGENT);
 		assertThat(record.getHashSha256()).isEqualTo(currentHash());
-		assertThat(record.getMensagemErro()).contains(foreignHash);
+		assertThat(record.getMensagemErro()).contains(foreignHash).contains("never sent");
 		assertThat(ledger.readHash(operationId)).contains(foreignHash);
 		assertThat(attemptRepository.findByOperationIdOrderByNumberAsc(operationId))
 			.extracting(AnchorAttempt::getResult)
 			.containsExactly(AnchorAttemptResult.DIVERGENT);
+	}
+
+	@Test
+	void tellsWhenTheLedgerHoldsTheHashSentEarlierButTheOperationChangedSince() {
+		ledger.failWith(new LedgerException("Timed out waiting for the receipt"));
+		service.anchorOperation(operationId);
+		String sentHash = currentHash();
+		ledger.recover();
+		ledger.anchor(operationId, sentHash);
+		new TransactionTemplate(transactionManager).executeWithoutResult(status ->
+			operationRepository.findById(operationId).orElseThrow().complete(9.9, List.of(0, 1), List.of()));
+
+		service.anchorOperation(operationId);
+
+		BlockchainRecord record = recordRepository.findByOperationId(operationId).orElseThrow();
+		assertThat(record.getStatus()).isEqualTo(AnchorStatus.DIVERGENT);
+		assertThat(record.getMensagemErro()).contains(sentHash).contains("earlier attempt");
+		assertThat(attemptRepository.findByOperationIdOrderByNumberAsc(operationId))
+			.extracting(AnchorAttempt::getResult)
+			.containsExactly(AnchorAttemptResult.FAILED, AnchorAttemptResult.DIVERGENT);
 	}
 
 	@Test

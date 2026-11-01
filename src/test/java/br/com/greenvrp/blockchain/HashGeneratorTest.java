@@ -108,4 +108,19 @@ class HashGeneratorTest {
 		assertThat(generator.hash(operation(5.5, 1010.0, List.of(2, 0, 1), 2L))).isNotEqualTo(original);
 	}
 
+	@Test
+	void ignoresTheFieldsThatChangeLegitimatelyAfterTheCalculation() {
+		Operation operation = baseline();
+		String original = generator.hash(operation);
+
+		operation.registrarTempoExecucao(4_321L);
+
+		assertThat(generator.canonicalJson(operation))
+			.doesNotContain("status")
+			.doesNotContain("errorMessage")
+			.doesNotContain("executionTime")
+			.doesNotContain("updatedAt");
+		assertThat(generator.hash(operation)).isEqualTo(original);
+	}
+
 }
