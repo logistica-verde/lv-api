@@ -54,10 +54,16 @@ public class BlockchainService {
 					return;
 				}
 				if (onLedger.isPresent()) {
+					boolean sentEarlier = existing.map(BlockchainRecord::getHashSha256)
+						.filter(onLedger.get()::equalsIgnoreCase)
+						.isPresent();
+					String message = sentEarlier
+						? "The ledger holds the hash this API sent on an earlier attempt (%s); the operation changed since then"
+							.formatted(onLedger.get())
+						: "The ledger holds a hash this API never sent for this operation: " + onLedger.get();
 					log.error("Operation {} diverges from the ledger: the ledger holds {} but the database hashes to {}",
 						operationId, onLedger.get(), hash);
-					settle(operationId, hash, AnchorAttemptResult.DIVERGENT, null, null,
-						"The ledger already holds a different hash for this operation: " + onLedger.get());
+					settle(operationId, hash, AnchorAttemptResult.DIVERGENT, null, null, message);
 					return;
 				}
 				AnchorReceipt receipt = ledger.anchor(operationId, hash);

@@ -13,6 +13,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.web3j.abi.FunctionEncoder;
 import org.web3j.abi.TypeReference;
+import org.web3j.abi.datatypes.Address;
 import org.web3j.abi.datatypes.Function;
 import org.web3j.abi.datatypes.generated.Bytes32;
 import org.web3j.abi.datatypes.generated.Uint256;
@@ -42,13 +43,19 @@ class AuditRegistryArtifactTest {
 		List.of(new TypeReference<Bytes32>() {
 		}));
 
+	private final Function owner = new Function(
+		"owner",
+		Collections.emptyList(),
+		List.of(new TypeReference<Address>() {
+		}));
+
 	@Test
 	void theCompiledBytecodeIsAValidHexString() throws IOException {
 		String bytecode = resource("/contracts/AuditRegistry.bin");
 
 		assertThat(bytecode).matches("[0-9a-f]+");
 		assertThat(bytecode.length() % 2).isZero();
-		assertThat(bytecode).startsWith("6080604052");
+		assertThat(bytecode).startsWith("60a0604052");
 	}
 
 	@Test
@@ -57,6 +64,17 @@ class AuditRegistryArtifactTest {
 
 		assertThat(bytecode).contains(selectorOf(anchor));
 		assertThat(bytecode).contains(selectorOf(getHash));
+		assertThat(bytecode).contains(selectorOf(owner));
+	}
+
+	@Test
+	void onlyTheAccountThatDeployedTheContractCanAnchor() throws IOException {
+		String source = Files.readString(Path.of("contracts", "AuditRegistry.sol"));
+
+		assertThat(source)
+			.contains("owner = msg.sender;")
+			.contains("require(msg.sender == owner, \"not the owner\");")
+			.contains("require(hashes[operationId] == bytes32(0), \"already anchored\");");
 	}
 
 	@Test
