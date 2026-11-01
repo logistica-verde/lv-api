@@ -4,7 +4,7 @@ Medida em 2026-11-01, sobre o commit `main` de cada repositório. Critério do T
 
 | Repositório | Comando | Testes | Cobertura |
 |---|---|---|---|
-| lv-api (JaCoCo) | `./mvnw test` (relatório em `target/site/jacoco`) | 1 suíte, ver relatório | instruções 98,1%, ramos 87,6% |
+| lv-api (JaCoCo) | `./mvnw test` (relatório em `target/site/jacoco`) | 423 aprovados | instruções 98,1%, ramos 87,6% |
 | lv-optimizer (pytest-cov) | `python -m pytest --cov=app` | 199 aprovados | linhas 98% |
 | lv-frontend (vitest v8) | `npm run test:coverage` | 854 aprovados | linhas 94,3%, ramos 88,4% |
 
