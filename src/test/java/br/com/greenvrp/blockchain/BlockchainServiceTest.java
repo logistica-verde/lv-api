@@ -31,6 +31,9 @@ class BlockchainServiceTest {
 	private BlockchainRecordRepository recordRepository;
 
 	@Autowired
+	private AnchorAttemptRepository attemptRepository;
+
+	@Autowired
 	private VehicleRepository vehicleRepository;
 
 	@Autowired
@@ -46,7 +49,7 @@ class BlockchainServiceTest {
 
 	@BeforeEach
 	void setUp() {
-		service = new BlockchainService(operationRepository, recordRepository, hashGenerator, ledger, transactionManager);
+		service = new BlockchainService(operationRepository, recordRepository, attemptRepository, hashGenerator, ledger, transactionManager);
 		Vehicle vehicle = vehicleRepository.save(new Vehicle("ABC1D23", 7500.0, "diesel"));
 		List<DeliveryPoint> points = List.of(
 			deliveryPointRepository.save(new DeliveryPoint("A", null, -23.55, -46.63)),
@@ -58,6 +61,7 @@ class BlockchainServiceTest {
 
 	@AfterEach
 	void cleanUp() {
+		attemptRepository.deleteAll();
 		recordRepository.deleteAll();
 		operationRepository.deleteAll();
 		deliveryPointRepository.deleteAll();
@@ -103,6 +107,90 @@ class BlockchainServiceTest {
 		assertThat(recordRepository.findAll()).hasSize(1);
 		assertThat(recordRepository.findByOperationId(operationId).orElseThrow().getStatus())
 			.isEqualTo(AnchorStatus.ANCHORED);
+	}
+
+	@Test
+	void logsEveryAttemptAndRetriesAFailedAnchorOnTheSameRecord() {
+		ledger.failWith(new LedgerException("Besu is down"));
+		service.anchorOperation(operationId);
+		ledger.recover();
+
+		int retried = service.retryFailed();
+
+		assertThat(retried).isEqualTo(1);
+		assertThat(recordRepository.findAll()).hasSize(1);
+		BlockchainRecord record = recordRepository.findByOperationId(operationId).orElseThrow();
+		assertThat(record.getStatus()).isEqualTo(AnchorStatus.ANCHORED);
+		assertThat(record.getMensagemErro()).isNull();
+		assertThat(attemptRepository.findByOperationIdOrderByNumberAsc(operationId))
+			.extracting(AnchorAttempt::getNumber, AnchorAttempt::getResult)
+			.containsExactly(
+				org.assertj.core.groups.Tuple.tuple(1, AnchorAttemptResult.FAILED),
+				org.assertj.core.groups.Tuple.tuple(2, AnchorAttemptResult.ANCHORED));
+	}
+
+	@Test
+	void recoversTheRecordWithoutResendingWhenTheHashIsAlreadyOnTheLedger() {
+		ledger.anchor(operationId, currentHash());
+
+		service.anchorOperation(operationId);
+
+		BlockchainRecord record = recordRepository.findByOperationId(operationId).orElseThrow();
+		assertThat(record.getStatus()).isEqualTo(AnchorStatus.ANCHORED);
+		assertThat(record.getTxHash()).isNull();
+		assertThat(attemptRepository.findByOperationIdOrderByNumberAsc(operationId))
+			.extracting(AnchorAttempt::getResult)
+			.containsExactly(AnchorAttemptResult.RECOVERED);
+	}
+
+	@Test
+	void flagsADivergenceInsteadOfResendingWhenTheLedgerHoldsAnotherHash() {
+		String foreignHash = "ab".repeat(32);
+		ledger.anchor(operationId, foreignHash);
+
+		service.anchorOperation(operationId);
+
+		BlockchainRecord record = recordRepository.findByOperationId(operationId).orElseThrow();
+		assertThat(record.getStatus()).isEqualTo(AnchorStatus.DIVERGENT);
+		assertThat(record.getHashSha256()).isEqualTo(currentHash());
+		assertThat(record.getMensagemErro()).contains(foreignHash);
+		assertThat(ledger.readHash(operationId)).contains(foreignHash);
+		assertThat(attemptRepository.findByOperationIdOrderByNumberAsc(operationId))
+			.extracting(AnchorAttempt::getResult)
+			.containsExactly(AnchorAttemptResult.DIVERGENT);
+	}
+
+	@Test
+	void neverRetriesOrReanchorsADivergentOperation() {
+		ledger.anchor(operationId, "ab".repeat(32));
+		service.anchorOperation(operationId);
+
+		assertThat(service.retryFailed()).isZero();
+		service.anchorOperation(operationId);
+
+		assertThat(attemptRepository.countByOperationId(operationId)).isEqualTo(1);
+		assertThat(recordRepository.findByOperationId(operationId).orElseThrow().getStatus())
+			.isEqualTo(AnchorStatus.DIVERGENT);
+	}
+
+	@Test
+	void doesNotRetryAnAnchorThatSucceeded() {
+		service.anchorOperation(operationId);
+
+		assertThat(service.retryFailed()).isZero();
+		assertThat(attemptRepository.countByOperationId(operationId)).isEqualTo(1);
+	}
+
+	@Test
+	void keepsTheRecordFailedWhenTheRetryFailsToo() {
+		ledger.failWith(new LedgerException("Besu is down"));
+		service.anchorOperation(operationId);
+
+		service.retryFailed();
+
+		assertThat(recordRepository.findByOperationId(operationId).orElseThrow().getStatus())
+			.isEqualTo(AnchorStatus.FAILED);
+		assertThat(attemptRepository.countByOperationId(operationId)).isEqualTo(2);
 	}
 
 	@Test

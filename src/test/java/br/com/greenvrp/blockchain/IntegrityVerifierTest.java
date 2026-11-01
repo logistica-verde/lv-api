@@ -33,6 +33,9 @@ class IntegrityVerifierTest {
 	private BlockchainRecordRepository recordRepository;
 
 	@Autowired
+	private AnchorAttemptRepository attemptRepository;
+
+	@Autowired
 	private VehicleRepository vehicleRepository;
 
 	@Autowired
@@ -53,7 +56,7 @@ class IntegrityVerifierTest {
 	@BeforeEach
 	void setUp() {
 		blockchainService = new BlockchainService(
-			operationRepository, recordRepository, hashGenerator, ledger, transactionManager);
+			operationRepository, recordRepository, attemptRepository, hashGenerator, ledger, transactionManager);
 		verifier = new IntegrityVerifier(
 			operationRepository, recordRepository, hashGenerator, ledger, transactionManager);
 		Vehicle vehicle = vehicleRepository.save(new Vehicle("ABC1D23", 7500.0, "diesel"));
@@ -67,6 +70,7 @@ class IntegrityVerifierTest {
 
 	@AfterEach
 	void cleanUp() {
+		attemptRepository.deleteAll();
 		recordRepository.deleteAll();
 		operationRepository.deleteAll();
 		deliveryPointRepository.deleteAll();
@@ -101,6 +105,7 @@ class IntegrityVerifierTest {
 	void stillDetectsTamperingWhenTheLocalRecordWasAlsoDeleted() {
 		blockchainService.anchorOperation(operationId);
 		jdbcTemplate.update("update operacoes set criterio = 'DISTANCE' where id = ?", operationId);
+		attemptRepository.deleteAll();
 		recordRepository.deleteAll();
 
 		IntegrityReport report = verifier.verify(operationId);
