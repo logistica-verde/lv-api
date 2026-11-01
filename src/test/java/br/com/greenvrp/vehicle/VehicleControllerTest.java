@@ -58,6 +58,40 @@ class VehicleControllerTest {
 	}
 
 	@Test
+	void createRejectsAPlateOutsideTheOldAndMercosulFormats() throws Exception {
+		for (String plate : new String[] {"AB12345", "ABC12", "ABC-1234", "1BC1D23"}) {
+			mockMvc.perform(post("/api/vehicles")
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("{\"placa\":\"" + plate + "\",\"massaKg\":7500.0,\"tipoCombustivel\":\"diesel\"}"))
+				.andExpect(status().isBadRequest());
+		}
+	}
+
+	@Test
+	void createAcceptsTheOldFormatAndLowercase() throws Exception {
+		given(vehicleRepository.save(org.mockito.ArgumentMatchers.any())).willReturn(new Vehicle("ABC1234", 7500.0, "diesel"));
+
+		for (String plate : new String[] {"ABC1234", "abc1d23"}) {
+			mockMvc.perform(post("/api/vehicles")
+					.contentType(MediaType.APPLICATION_JSON)
+					.content("{\"placa\":\"" + plate + "\",\"massaKg\":7500.0,\"tipoCombustivel\":\"diesel\"}"))
+				.andExpect(status().isCreated());
+		}
+	}
+
+	@Test
+	void createRejectsAnAbsurdMassOrAnOverlongFuel() throws Exception {
+		mockMvc.perform(post("/api/vehicles")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"placa\":\"ABC1D23\",\"massaKg\":100001,\"tipoCombustivel\":\"diesel\"}"))
+			.andExpect(status().isBadRequest());
+		mockMvc.perform(post("/api/vehicles")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"placa\":\"ABC1D23\",\"massaKg\":7500,\"tipoCombustivel\":\"" + "x".repeat(31) + "\"}"))
+			.andExpect(status().isBadRequest());
+	}
+
+	@Test
 	void listReturnsOnlyActiveVehicles() throws Exception {
 		given(vehicleRepository.findByAtivoTrue())
 			.willReturn(List.of(new Vehicle("ABC1D23", 7500.0, "diesel")));
