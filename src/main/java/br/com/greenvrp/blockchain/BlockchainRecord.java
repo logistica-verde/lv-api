@@ -68,6 +68,26 @@ public class BlockchainRecord {
 		return record;
 	}
 
+	public void markAnchored(String hashSha256, String txHash, Long blockNumber) {
+		this.hashSha256 = hashSha256;
+		this.txHash = txHash;
+		this.blocoLedger = blockNumber;
+		this.status = AnchorStatus.ANCHORED;
+		this.mensagemErro = null;
+		this.timestampRegistro = Instant.now();
+	}
+
+	public void markFailed(String hashSha256, String message) {
+		this.hashSha256 = hashSha256;
+		this.status = AnchorStatus.FAILED;
+		this.mensagemErro = message;
+		this.timestampRegistro = Instant.now();
+	}
+
+	public Operation getOperation() {
+		return operation;
+	}
+
 	public Long getId() {
 		return id;
 	}
