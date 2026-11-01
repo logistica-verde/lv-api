@@ -4,6 +4,7 @@ public enum ExecutionStatus {
 
 	SCHEDULED,
 	IN_PROGRESS,
+	REPLANNING,
 	FINISHED,
 	CANCELLED
 

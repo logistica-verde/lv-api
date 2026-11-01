@@ -54,6 +54,22 @@ public class ExecutionController {
 		return executionService.finish(id);
 	}
 
+	@PostMapping("/{id}/stops/{pointId}/deliver")
+	public ExecutionResponse deliverStop(@PathVariable Long id, @PathVariable Long pointId) {
+		return executionService.deliverStop(id, pointId);
+	}
+
+	@PostMapping("/{id}/stops/{pointId}/cancel")
+	public ExecutionResponse cancelStop(
+		@PathVariable Long id, @PathVariable Long pointId, @Valid @RequestBody CancelRequest request) {
+		return executionService.cancelStop(id, pointId, request.reason());
+	}
+
+	@PostMapping("/{id}/replan")
+	public ExecutionResponse replan(@PathVariable Long id, @Valid @RequestBody ReplanRequest request) {
+		return executionService.replan(id, request.latitude(), request.longitude());
+	}
+
 	@PostMapping("/{id}/cancel")
 	public ExecutionResponse cancel(
 		@PathVariable Long id, @Valid @RequestBody CancelRequest request, Principal principal) {
