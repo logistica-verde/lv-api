@@ -11,6 +11,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import br.com.greenvrp.blockchain.BlockchainService;
+import br.com.greenvrp.base.Base;
+import br.com.greenvrp.base.BaseRepository;
 import br.com.greenvrp.deliverypoint.DeliveryPoint;
 import br.com.greenvrp.deliverypoint.DeliveryPointRepository;
 import br.com.greenvrp.geo.PairSegmentSource;
@@ -58,6 +60,9 @@ class RouteProcessorTest {
 	@Autowired
 	private PlatformTransactionManager transactionManager;
 
+	@Autowired
+	private BaseRepository baseRepository;
+
 	private final PairSegmentSource geoQueryService = mock(PairSegmentSource.class);
 	private final OptimizerClient optimizerClient = mock(OptimizerClient.class);
 	private final BlockchainService blockchainService = mock(BlockchainService.class);
@@ -90,6 +95,7 @@ class RouteProcessorTest {
 	@AfterEach
 	void cleanUp() {
 		operationRepository.deleteAll();
+		baseRepository.deleteAll();
 		deliveryPointRepository.deleteAll();
 		vehicleRepository.deleteAll();
 	}
@@ -158,6 +164,56 @@ class RouteProcessorTest {
 					tuple(pointIds.get(0), pointIds.get(2), 3.5, 1002.0));
 			return null;
 		});
+	}
+
+	@Test
+	void closesTheRouteAtTheBaseWhenTheOperationReturnsToIt() {
+		Vehicle vehicle = vehicleRepository.findAll().get(0);
+		List<DeliveryPoint> points = deliveryPointRepository.findAllById(pointIds);
+		Base base = baseRepository.save(new Base("Base Central", null, -23.55, -46.63, points.get(0)));
+		Long closedId = operationRepository
+			.save(Operation.pending(vehicle, OptimizationCriterion.EMISSION, points, null, base))
+			.getId();
+		when(optimizerClient.optimize(any())).thenReturn(CompletableFuture.completedFuture(
+			new OptimizeResponse(
+				List.of(0, 2, 1, 0), 9.0, 3000.0,
+				List.of(new SegmentEmission(0, 2, 3.0), new SegmentEmission(2, 1, 4.0), new SegmentEmission(1, 0, 2.0)))));
+
+		processor.processAsync(closedId).join();
+
+		ArgumentCaptor<OptimizeRequest> sent = ArgumentCaptor.forClass(OptimizeRequest.class);
+		verify(optimizerClient).optimize(sent.capture());
+		assertThat(sent.getValue().returnToDepot()).isTrue();
+		inTransaction(() -> {
+			Operation operation = operationRepository.findById(closedId).orElseThrow();
+			assertThat(operation.getStatus()).isEqualTo(OperationStatus.COMPLETED);
+			assertThat(operation.isRetornaBase()).isTrue();
+			assertThat(operation.getPoints())
+				.extracting(item -> item.getPoint().getNome(), OperationPoint::getOrdemVisita)
+				.containsExactlyInAnyOrder(tuple("P1", 1), tuple("P3", 2), tuple("P2", 3));
+			assertThat(operation.getSegments())
+				.extracting(
+					segment -> segment.getOrigin().getNome(),
+					segment -> segment.getDestination().getNome(),
+					RouteSegment::getEmissaoKgCo2)
+				.containsExactly(tuple("P1", "P3", 3.0), tuple("P3", "P2", 4.0), tuple("P2", "P1", 2.0));
+			assertThat(operation.getDistanciaTotalMetros()).isGreaterThan(0.0);
+			return null;
+		});
+	}
+
+	@Test
+	void doesNotAskTheOptimizerToCloseTheRouteWhenThereIsNoBase() {
+		when(optimizerClient.optimize(any())).thenReturn(CompletableFuture.completedFuture(
+			new OptimizeResponse(
+				List.of(0, 1, 2), 5.5, 2010.0,
+				List.of(new SegmentEmission(0, 1, 2.0), new SegmentEmission(1, 2, 3.5)))));
+
+		processor.processAsync(operationId).join();
+
+		ArgumentCaptor<OptimizeRequest> sent = ArgumentCaptor.forClass(OptimizeRequest.class);
+		verify(optimizerClient).optimize(sent.capture());
+		assertThat(sent.getValue().returnToDepot()).isNull();
 	}
 
 	@Test

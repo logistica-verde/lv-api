@@ -27,7 +27,9 @@ public record RouteRequest(
 
 	@DecimalMin("0")
 	@DecimalMax("100000")
-	Double cargoKg
+	Double cargoKg,
+
+	Long baseId
 
 ) {
 
@@ -49,16 +51,21 @@ public record RouteRequest(
 	@JsonIgnore
 	@AssertTrue(message = "at least two delivery points are required without an origin")
 	public boolean isEnoughPoints() {
-		return origin != null || deliveryPointIds == null || deliveryPointIds.size() >= 2;
+		return origin != null || baseId != null || deliveryPointIds == null || deliveryPointIds.size() >= 2;
 	}
 
 	public RouteRequest(Long vehicleId, List<Long> deliveryPointIds, OptimizationCriterion criterion) {
-		this(vehicleId, deliveryPointIds, criterion, null, null);
+		this(vehicleId, deliveryPointIds, criterion, null, null, null);
 	}
 
 	public RouteRequest(
 		Long vehicleId, List<Long> deliveryPointIds, OptimizationCriterion criterion, Origin origin) {
-		this(vehicleId, deliveryPointIds, criterion, origin, null);
+		this(vehicleId, deliveryPointIds, criterion, origin, null, null);
+	}
+
+	public RouteRequest(
+		Long vehicleId, List<Long> deliveryPointIds, OptimizationCriterion criterion, Origin origin, Double cargoKg) {
+		this(vehicleId, deliveryPointIds, criterion, origin, cargoKg, null);
 	}
 
 }

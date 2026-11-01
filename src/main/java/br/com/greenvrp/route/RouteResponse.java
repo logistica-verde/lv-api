@@ -19,7 +19,9 @@ public record RouteResponse(
 	String errorMessage,
 	List<PointItem> points,
 	List<SegmentItem> segments,
-	Double cargoKg
+	Double cargoKg,
+	boolean returnsToBase,
+	String baseName
 
 ) {
 
@@ -28,7 +30,7 @@ public record RouteResponse(
 		Double totalEmissionKg, Double totalDistanceMeters, Long executionMs, String errorMessage,
 		List<PointItem> points, List<SegmentItem> segments) {
 		this(id, vehicleId, criterion, status, createdAt, totalEmissionKg, totalDistanceMeters, executionMs,
-			errorMessage, points, segments, null);
+			errorMessage, points, segments, null, false, null);
 	}
 
 	public record PointItem(
@@ -99,7 +101,9 @@ public record RouteResponse(
 			operation.getMensagemErro(),
 			points,
 			segments,
-			operation.getCargaKg());
+			operation.getCargaKg(),
+			operation.isRetornaBase(),
+			operation.getBase() == null ? null : operation.getBase().getNome());
 	}
 
 }

@@ -79,6 +79,16 @@ class HashGeneratorTest {
 	}
 
 	@Test
+	void marksTheReturnToTheBaseOnlyWhenTheOperationReturns() {
+		Operation returning = baseline();
+		ReflectionTestUtils.setField(returning, "retornaBase", true);
+
+		assertThat(generator.canonicalJson(returning)).contains("\"returnToBase\":true,\"totalEmissionKg\"");
+		assertThat(generator.canonicalJson(baseline())).doesNotContain("returnToBase");
+		assertThat(generator.hash(returning)).isNotEqualTo(generator.hash(baseline()));
+	}
+
+	@Test
 	void producesTheKnownSha256ForTheCanonicalJson() {
 		assertThat(generator.hash(baseline())).isEqualTo(GOLDEN_HASH);
 	}

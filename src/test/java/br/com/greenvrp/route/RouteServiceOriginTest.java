@@ -5,6 +5,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import br.com.greenvrp.api.InvalidRequestException;
+import br.com.greenvrp.api.ResourceNotFoundException;
+import br.com.greenvrp.base.Base;
+import br.com.greenvrp.base.BaseRepository;
 import br.com.greenvrp.deliverypoint.DeliveryPoint;
 import br.com.greenvrp.deliverypoint.DeliveryPointRepository;
 import br.com.greenvrp.geo.CoverageArea;
@@ -36,6 +39,9 @@ class RouteServiceOriginTest {
 
 	@MockitoBean
 	private RouteProcessor routeProcessor;
+
+	@Autowired
+	private BaseRepository baseRepository;
 
 	private Vehicle vehicle;
 	private DeliveryPoint first;
@@ -124,6 +130,74 @@ class RouteServiceOriginTest {
 		RouteRequest alone = new RouteRequest(vehicle.getId(), List.of(first.getId()), OptimizationCriterion.EMISSION);
 
 		assertThatThrownBy(() -> routeService.calculate(alone)).isInstanceOf(InvalidRequestException.class);
+	}
+
+
+	private Base registerBase(boolean active) {
+		DeliveryPoint basePoint = new DeliveryPoint("Base Central", null, -23.5, -46.6);
+		basePoint.desativar();
+		Base base = new Base("Base Central", null, -23.5, -46.6, deliveryPointRepository.save(basePoint));
+		if (!active) {
+			base.desativar();
+		}
+		return baseRepository.save(base);
+	}
+
+	private RouteRequest fromBase(Long baseId, Long... pointIds) {
+		return new RouteRequest(
+			vehicle.getId(), List.of(pointIds), OptimizationCriterion.EMISSION, null, null, baseId);
+	}
+
+	@Test
+	void startsAndEndsAtTheBaseWhenTheRouteHasOne() {
+		Base base = registerBase(true);
+
+		RouteAcceptedResponse accepted = routeService.calculate(fromBase(base.getId(), second.getId(), first.getId()));
+
+		RouteResponse response = routeService.get(accepted.id());
+		assertThat(response.points()).extracting(RouteResponse.PointItem::name).containsExactly("Base Central", "A", "B");
+		assertThat(response.returnsToBase()).isTrue();
+		assertThat(response.baseName()).isEqualTo("Base Central");
+	}
+
+	@Test
+	void aSingleStopIsEnoughWithABase() {
+		Base base = registerBase(true);
+
+		RouteAcceptedResponse accepted = routeService.calculate(fromBase(base.getId(), first.getId()));
+
+		assertThat(routeService.get(accepted.id()).points()).hasSize(2);
+	}
+
+	@Test
+	void aRouteWithoutBaseDoesNotReturn() {
+		RouteAcceptedResponse accepted = routeService.calculate(from(-23.5505, -46.6333, first.getId()));
+
+		RouteResponse response = routeService.get(accepted.id());
+		assertThat(response.returnsToBase()).isFalse();
+		assertThat(response.baseName()).isNull();
+	}
+
+	@Test
+	void refusesABaseAndAnOriginTogether() {
+		Base base = registerBase(true);
+		RouteRequest both = new RouteRequest(
+			vehicle.getId(), List.of(first.getId()), OptimizationCriterion.EMISSION,
+			new RouteRequest.Origin(-23.55, -46.63), null, base.getId());
+
+		assertThatThrownBy(() -> routeService.calculate(both)).isInstanceOf(InvalidRequestException.class);
+		verifyNoInteractions(routeProcessor);
+	}
+
+	@Test
+	void refusesAnInactiveOrUnknownBase() {
+		Base inactive = registerBase(false);
+
+		assertThatThrownBy(() -> routeService.calculate(fromBase(inactive.getId(), first.getId())))
+			.isInstanceOf(InvalidRequestException.class);
+		assertThatThrownBy(() -> routeService.calculate(fromBase(9999L, first.getId())))
+			.isInstanceOf(ResourceNotFoundException.class);
+		verifyNoInteractions(routeProcessor);
 	}
 
 }

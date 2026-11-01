@@ -37,6 +37,7 @@ public class HashGenerator {
 			.append(",\"criterion\":\"").append(operation.getCriterio().name()).append('"')
 			.append(",\"createdAt\":\"").append(operation.getDataHora().truncatedTo(ChronoUnit.MILLIS)).append('"')
 			.append(cargo(operation))
+			.append(operation.isRetornaBase() ? ",\"returnToBase\":true" : "")
 			.append(",\"totalEmissionKg\":").append(number(operation.getEmissaoTotalKg()))
 			.append(",\"points\":[");
 		for (int index = 0; index < points.size(); index++) {
