@@ -25,6 +25,9 @@ import br.com.greenvrp.optimizer.OptimizeResponse;
 import br.com.greenvrp.optimizer.OptimizeResponse.SegmentEmission;
 import br.com.greenvrp.optimizer.OptimizerClient;
 import br.com.greenvrp.optimizer.OptimizerException;
+import br.com.greenvrp.progress.CalculationProgress;
+import br.com.greenvrp.progress.CalculationProgressTracker;
+import br.com.greenvrp.progress.CalculationStage;
 import br.com.greenvrp.settings.GaSettingsService;
 import br.com.greenvrp.settings.GaSettingsValues;
 import br.com.greenvrp.vehicle.Vehicle;
@@ -32,6 +35,7 @@ import br.com.greenvrp.vehicle.VehicleRepository;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -89,7 +93,7 @@ class RouteProcessorTest {
 			.save(Operation.pending(vehicle, OptimizationCriterion.EMISSION, points))
 			.getId();
 
-		when(geoQueryService.buildPairSegments(anyList())).thenReturn(allPairs(3));
+		when(geoQueryService.buildPairSegments(anyList(), any())).thenReturn(allPairs(3));
 	}
 
 	@AfterEach
@@ -123,7 +127,7 @@ class RouteProcessorTest {
 		Long loadedId = operationRepository
 			.save(Operation.pending(vehicle, OptimizationCriterion.EMISSION, points, 1500.0))
 			.getId();
-		when(optimizerClient.optimize(any())).thenReturn(CompletableFuture.completedFuture(
+		when(optimizerClient.optimize(any(), any())).thenReturn(CompletableFuture.completedFuture(
 			new OptimizeResponse(
 				List.of(0, 1, 2), 5.5, 2010.0,
 				List.of(new SegmentEmission(0, 1, 2.0), new SegmentEmission(1, 2, 3.5)))));
@@ -131,7 +135,7 @@ class RouteProcessorTest {
 		processor.processAsync(loadedId).join();
 
 		ArgumentCaptor<OptimizeRequest> sent = ArgumentCaptor.forClass(OptimizeRequest.class);
-		verify(optimizerClient).optimize(sent.capture());
+		verify(optimizerClient).optimize(sent.capture(), any());
 		assertThat(sent.getValue().vehicleMassKg()).isEqualTo(9000.0);
 	}
 
@@ -140,7 +144,7 @@ class RouteProcessorTest {
 		OptimizeResponse response = new OptimizeResponse(
 			List.of(1, 0, 2), 5.5, 2010.0,
 			List.of(new SegmentEmission(1, 0, 2.0), new SegmentEmission(0, 2, 3.5)));
-		when(optimizerClient.optimize(any())).thenReturn(CompletableFuture.completedFuture(response));
+		when(optimizerClient.optimize(any(), any())).thenReturn(CompletableFuture.completedFuture(response));
 
 		processor.processAsync(operationId).join();
 
@@ -174,7 +178,7 @@ class RouteProcessorTest {
 		Long closedId = operationRepository
 			.save(Operation.pending(vehicle, OptimizationCriterion.EMISSION, points, null, base))
 			.getId();
-		when(optimizerClient.optimize(any())).thenReturn(CompletableFuture.completedFuture(
+		when(optimizerClient.optimize(any(), any())).thenReturn(CompletableFuture.completedFuture(
 			new OptimizeResponse(
 				List.of(0, 2, 1, 0), 9.0, 3000.0,
 				List.of(new SegmentEmission(0, 2, 3.0), new SegmentEmission(2, 1, 4.0), new SegmentEmission(1, 0, 2.0)))));
@@ -182,7 +186,7 @@ class RouteProcessorTest {
 		processor.processAsync(closedId).join();
 
 		ArgumentCaptor<OptimizeRequest> sent = ArgumentCaptor.forClass(OptimizeRequest.class);
-		verify(optimizerClient).optimize(sent.capture());
+		verify(optimizerClient).optimize(sent.capture(), any());
 		assertThat(sent.getValue().returnToDepot()).isTrue();
 		inTransaction(() -> {
 			Operation operation = operationRepository.findById(closedId).orElseThrow();
@@ -204,7 +208,7 @@ class RouteProcessorTest {
 
 	@Test
 	void doesNotAskTheOptimizerToCloseTheRouteWhenThereIsNoBase() {
-		when(optimizerClient.optimize(any())).thenReturn(CompletableFuture.completedFuture(
+		when(optimizerClient.optimize(any(), any())).thenReturn(CompletableFuture.completedFuture(
 			new OptimizeResponse(
 				List.of(0, 1, 2), 5.5, 2010.0,
 				List.of(new SegmentEmission(0, 1, 2.0), new SegmentEmission(1, 2, 3.5)))));
@@ -212,7 +216,7 @@ class RouteProcessorTest {
 		processor.processAsync(operationId).join();
 
 		ArgumentCaptor<OptimizeRequest> sent = ArgumentCaptor.forClass(OptimizeRequest.class);
-		verify(optimizerClient).optimize(sent.capture());
+		verify(optimizerClient).optimize(sent.capture(), any());
 		assertThat(sent.getValue().returnToDepot()).isNull();
 	}
 
@@ -223,11 +227,11 @@ class RouteProcessorTest {
 		pairs.replaceAll(pair -> pair.fromIndex() == 1 && pair.toIndex() == 0
 			? new PairSegment(1, 0, pair.distanceMeters(), pair.averageSpeedKmh(), pair.slopePercent(), street)
 			: pair);
-		when(geoQueryService.buildPairSegments(anyList())).thenReturn(pairs);
+		when(geoQueryService.buildPairSegments(anyList(), any())).thenReturn(pairs);
 		OptimizeResponse response = new OptimizeResponse(
 			List.of(1, 0, 2), 5.5, 2010.0,
 			List.of(new SegmentEmission(1, 0, 2.0), new SegmentEmission(0, 2, 3.5)));
-		when(optimizerClient.optimize(any())).thenReturn(CompletableFuture.completedFuture(response));
+		when(optimizerClient.optimize(any(), any())).thenReturn(CompletableFuture.completedFuture(response));
 
 		processor.processAsync(operationId).join();
 
@@ -250,7 +254,7 @@ class RouteProcessorTest {
 		OptimizeResponse response = new OptimizeResponse(
 			List.of(1, 0, 2), 5.5, 2010.0,
 			List.of(new SegmentEmission(1, 0, 2.0), new SegmentEmission(0, 2, 3.5)));
-		when(optimizerClient.optimize(any())).thenReturn(CompletableFuture.supplyAsync(() -> {
+		when(optimizerClient.optimize(any(), any())).thenReturn(CompletableFuture.supplyAsync(() -> {
 			try {
 				Thread.sleep(60);
 			}
@@ -269,9 +273,57 @@ class RouteProcessorTest {
 		});
 	}
 
+	private RouteProcessor processorReportingTo(CalculationProgressTracker tracker) {
+		return new RouteProcessor(
+			operationRepository, geoQueryService, optimizerClient, blockchainService, gaSettingsService,
+			transactionManager, Runnable::run, event -> { }, tracker);
+	}
+
+	@Test
+	void publishesEveryStageOfTheCalculationInOrder() {
+		CalculationProgressTracker tracker = new CalculationProgressTracker();
+		List<CalculationProgress> published = new CopyOnWriteArrayList<>();
+		tracker.subscribe(published::add);
+		when(geoQueryService.buildPairSegments(anyList(), any())).thenAnswer(invocation -> {
+			PairSegmentSource.TracingListener listener = invocation.getArgument(1);
+			listener.traced(3, 7);
+			listener.traced(7, 7);
+			return allPairs(3);
+		});
+		when(optimizerClient.optimize(any(), any())).thenAnswer(invocation -> {
+			OptimizerClient.GenerationListener listener = invocation.getArgument(1);
+			listener.generation(0, 10);
+			listener.generation(5, 10);
+			listener.generation(10, 10);
+			return CompletableFuture.completedFuture(new OptimizeResponse(
+				List.of(0, 1, 2), 5.5, 2010.0,
+				List.of(new SegmentEmission(0, 1, 2.0), new SegmentEmission(1, 2, 3.5))));
+		});
+
+		processorReportingTo(tracker).processAsync(operationId).join();
+
+		assertThat(published).allSatisfy(progress -> assertThat(progress.operationId()).isEqualTo(operationId));
+		assertThat(published).extracting(CalculationProgress::stage).containsExactly(
+			CalculationStage.QUEUED, CalculationStage.PREPARING, CalculationStage.PREPARING, CalculationStage.PREPARING,
+			CalculationStage.OPTIMIZING, CalculationStage.OPTIMIZING, CalculationStage.OPTIMIZING,
+			CalculationStage.SAVING, CalculationStage.COMPLETED);
+		assertThat(published).extracting(CalculationProgress::percent).isSorted();
+	}
+
+	@Test
+	void publishesTheFailureWhenTheOptimizerFails() {
+		CalculationProgressTracker tracker = new CalculationProgressTracker();
+		when(optimizerClient.optimize(any(), any())).thenReturn(CompletableFuture.failedFuture(
+			new OptimizerException("Optimizer call failed: boom", new RuntimeException())));
+
+		processorReportingTo(tracker).processAsync(operationId).join();
+
+		assertThat(tracker.latest(operationId)).map(CalculationProgress::stage).contains(CalculationStage.FAILED);
+	}
+
 	@Test
 	void leavesTheExecutionTimeEmptyWhenTheOperationFails() {
-		when(optimizerClient.optimize(any())).thenReturn(CompletableFuture.failedFuture(
+		when(optimizerClient.optimize(any(), any())).thenReturn(CompletableFuture.failedFuture(
 			new OptimizerException("Optimizer call failed: boom", new RuntimeException())));
 
 		processor.processAsync(operationId).join();
@@ -287,27 +339,27 @@ class RouteProcessorTest {
 	@Test
 	void sendsTheConfiguredGeneticAlgorithmParametersToTheOptimizer() {
 		when(gaSettingsService.current()).thenReturn(new GaSettingsValues(250, 400, 0.9, 0.1));
-		when(optimizerClient.optimize(any())).thenReturn(CompletableFuture.failedFuture(
+		when(optimizerClient.optimize(any(), any())).thenReturn(CompletableFuture.failedFuture(
 			new OptimizerException("Optimizer call failed: stop here", new RuntimeException())));
 
 		processor.processAsync(operationId).join();
 
 		ArgumentCaptor<OptimizeRequest> sent = ArgumentCaptor.forClass(OptimizeRequest.class);
-		verify(optimizerClient).optimize(sent.capture());
+		verify(optimizerClient).optimize(sent.capture(), any());
 		assertThat(sent.getValue().gaParams())
 			.isEqualTo(new OptimizeRequest.GaParams(250, 400, 0.9, 0.1));
 	}
 
 	@Test
 	void sendsAFixedSeedSoTheSameStopsGiveTheSameRoute() {
-		when(optimizerClient.optimize(any())).thenReturn(CompletableFuture.failedFuture(
+		when(optimizerClient.optimize(any(), any())).thenReturn(CompletableFuture.failedFuture(
 			new OptimizerException("Optimizer call failed: stop here", new RuntimeException())));
 
 		processor.processAsync(operationId).join();
 		processor.processAsync(operationId).join();
 
 		ArgumentCaptor<OptimizeRequest> sent = ArgumentCaptor.forClass(OptimizeRequest.class);
-		verify(optimizerClient, times(2)).optimize(sent.capture());
+		verify(optimizerClient, times(2)).optimize(sent.capture(), any());
 		assertThat(sent.getAllValues().get(0).seed()).isNotNull();
 		assertThat(sent.getAllValues().get(0).seed()).isEqualTo(sent.getAllValues().get(1).seed());
 	}
@@ -331,19 +383,19 @@ class RouteProcessorTest {
 
 	@Test
 	void sendsTheDefaultParametersWhenNothingWasConfigured() {
-		when(optimizerClient.optimize(any())).thenReturn(CompletableFuture.failedFuture(
+		when(optimizerClient.optimize(any(), any())).thenReturn(CompletableFuture.failedFuture(
 			new OptimizerException("Optimizer call failed: stop here", new RuntimeException())));
 
 		processor.processAsync(operationId).join();
 
 		ArgumentCaptor<OptimizeRequest> sent = ArgumentCaptor.forClass(OptimizeRequest.class);
-		verify(optimizerClient).optimize(sent.capture());
+		verify(optimizerClient).optimize(sent.capture(), any());
 		assertThat(sent.getValue().gaParams()).isEqualTo(new OptimizeRequest.GaParams(300, 500, 0.9, 0.4));
 	}
 
 	@Test
 	void marksOperationFailedWhenOptimizerCallFails() {
-		when(optimizerClient.optimize(any())).thenReturn(CompletableFuture.failedFuture(
+		when(optimizerClient.optimize(any(), any())).thenReturn(CompletableFuture.failedFuture(
 			new OptimizerException("Optimizer call failed: connection refused", new RuntimeException())));
 
 		processor.processAsync(operationId).join();
@@ -358,7 +410,7 @@ class RouteProcessorTest {
 	void marksOperationFailedWhenOptimizerReturnsInvalidSequence() {
 		OptimizeResponse response = new OptimizeResponse(
 			List.of(0, 0, 1), 5.5, 2010.0, List.of(new SegmentEmission(0, 1, 2.0)));
-		when(optimizerClient.optimize(any())).thenReturn(CompletableFuture.completedFuture(response));
+		when(optimizerClient.optimize(any(), any())).thenReturn(CompletableFuture.completedFuture(response));
 
 		processor.processAsync(operationId).join();
 
@@ -372,7 +424,7 @@ class RouteProcessorTest {
 	void marksOperationFailedWhenOptimizerOmitsALegEmission() {
 		OptimizeResponse response = new OptimizeResponse(
 			List.of(0, 1, 2), 5.5, 2010.0, List.of(new SegmentEmission(0, 1, 2.0)));
-		when(optimizerClient.optimize(any())).thenReturn(CompletableFuture.completedFuture(response));
+		when(optimizerClient.optimize(any(), any())).thenReturn(CompletableFuture.completedFuture(response));
 
 		processor.processAsync(operationId).join();
 
@@ -384,7 +436,7 @@ class RouteProcessorTest {
 
 	@Test
 	void marksOperationFailedWhenAPointHasNoRoadData() {
-		when(geoQueryService.buildPairSegments(anyList()))
+		when(geoQueryService.buildPairSegments(anyList(), any()))
 			.thenThrow(new RoadDataNotFoundException("No road segment found for delivery point 'P1'"));
 
 		processor.processAsync(operationId).join();

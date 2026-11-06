@@ -10,6 +10,7 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -164,6 +165,68 @@ class OptimizerClientTest {
 		assertThatThrownBy(() -> client.optimize(sampleRequest()).get(5, TimeUnit.SECONDS))
 			.isInstanceOf(ExecutionException.class)
 			.hasCauseInstanceOf(OptimizerException.class);
+	}
+
+	private HttpServer fakeStream(String ndjson) throws IOException {
+		HttpServer fake = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+		fake.createContext("/optimize/stream", exchange -> {
+			exchange.getRequestBody().readAllBytes();
+			byte[] bytes = ndjson.getBytes(StandardCharsets.UTF_8);
+			exchange.getResponseHeaders().add("Content-Type", MediaType.APPLICATION_NDJSON_VALUE);
+			exchange.sendResponseHeaders(200, bytes.length);
+			exchange.getResponseBody().write(bytes);
+			exchange.close();
+		});
+		return fake;
+	}
+
+	@Test
+	void reportsEveryGenerationTheStreamSendsAndReturnsTheResult() throws Exception {
+		OptimizerClient client = clientFor(fakeStream("""
+			{"type":"progress","generation":0,"generations":500}
+			{"type":"progress","generation":240,"generations":500}
+			{"type":"progress","generation":500,"generations":500}
+			{"type":"result","result":{"sequence":[0,1],"total_emission_kg":3.2,"total_distance_meters":1200.0,\
+			"segment_emissions":[{"from_index":0,"to_index":1,"emission_kg":3.2}],"generations":500,\
+			"elapsed_seconds":0.4,"converged_at_generation":2,"best_fitness_history":[5.0,3.2]}}
+			"""), Duration.ofSeconds(5));
+		List<int[]> reported = new CopyOnWriteArrayList<>();
+
+		OptimizeResponse response = client.optimize(sampleRequest(), (generation, generations) ->
+			reported.add(new int[] {generation, generations})).get(5, TimeUnit.SECONDS);
+
+		assertThat(reported).extracting(pair -> pair[0]).containsExactly(0, 240, 500);
+		assertThat(reported).extracting(pair -> pair[1]).containsOnly(500);
+		assertThat(response.sequence()).containsExactly(0, 1);
+		assertThat(response.totalEmissionKg()).isEqualTo(3.2);
+		assertThat(response.convergence()).containsExactly(5.0, 3.2);
+	}
+
+	@Test
+	void turnsAnErrorEventIntoAnOptimizerException() throws Exception {
+		OptimizerClient client = clientFor(fakeStream("""
+			{"type":"progress","generation":0,"generations":500}
+			{"type":"error","detail":"The optimizer worker stopped unexpectedly"}
+			"""), Duration.ofSeconds(5));
+
+		assertThatThrownBy(() -> client.optimize(sampleRequest(), (generation, generations) -> { })
+			.get(5, TimeUnit.SECONDS))
+			.isInstanceOf(ExecutionException.class)
+			.hasCauseInstanceOf(OptimizerException.class)
+			.hasMessageContaining("The optimizer worker stopped unexpectedly");
+	}
+
+	@Test
+	void failsWhenTheStreamEndsWithoutAResult() throws Exception {
+		OptimizerClient client = clientFor(fakeStream("""
+			{"type":"progress","generation":0,"generations":500}
+			"""), Duration.ofSeconds(5));
+
+		assertThatThrownBy(() -> client.optimize(sampleRequest(), (generation, generations) -> { })
+			.get(5, TimeUnit.SECONDS))
+			.isInstanceOf(ExecutionException.class)
+			.hasCauseInstanceOf(OptimizerException.class)
+			.hasMessageContaining("without a result");
 	}
 
 }

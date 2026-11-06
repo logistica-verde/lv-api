@@ -87,6 +87,20 @@ class RouteFlowIntegrationTest {
 			exchange.getResponseBody().write(body);
 			exchange.close();
 		});
+		fakeOptimizer.createContext("/optimize/stream", exchange -> {
+			RECEIVED_BODY.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+			byte[] body = """
+				{"type":"progress","generation":0,"generations":10}
+				{"type":"progress","generation":10,"generations":10}
+				{"type":"result","result":{"sequence":[2,0,1],"total_emission_kg":5.5,"total_distance_meters":2000.0,\
+				"segment_emissions":[{"from_index":2,"to_index":0,"emission_kg":2.0},\
+				{"from_index":0,"to_index":1,"emission_kg":3.5}]}}
+				""".getBytes(StandardCharsets.UTF_8);
+			exchange.getResponseHeaders().add("Content-Type", MediaType.APPLICATION_NDJSON_VALUE);
+			exchange.sendResponseHeaders(200, body.length);
+			exchange.getResponseBody().write(body);
+			exchange.close();
+		});
 		fakeOptimizer.start();
 	}
 

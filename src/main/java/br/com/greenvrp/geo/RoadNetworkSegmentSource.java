@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -39,13 +40,22 @@ public class RoadNetworkSegmentSource implements PairSegmentSource {
 
 	@Override
 	public List<PairSegment> buildPairSegments(List<DeliveryPoint> points) {
-		List<Traced> traced = trace(points);
+		return buildPairSegments(points, (done, total) -> { });
+	}
+
+	@Override
+	public List<PairSegment> buildPairSegments(List<DeliveryPoint> points, TracingListener listener) {
+		int legs = points.size() * (points.size() - 1);
+		int steps = legs + 1;
+		List<Traced> traced = trace(points, listener, steps);
 		List<GeoPoint> everySample = traced.stream().flatMap(item -> item.samples().stream()).toList();
 		Map<GeoPoint, Double> elevations = elevationClient.elevations(everySample);
+		listener.traced(steps, steps);
 		return traced.stream().map(item -> toSegment(item, elevations)).toList();
 	}
 
-	private List<Traced> trace(List<DeliveryPoint> points) {
+	private List<Traced> trace(List<DeliveryPoint> points, TracingListener listener, int steps) {
+		AtomicInteger done = new AtomicInteger();
 		List<CompletableFuture<Traced>> pending = new ArrayList<>();
 		for (int from = 0; from < points.size(); from++) {
 			for (int to = 0; to < points.size(); to++) {
@@ -53,7 +63,12 @@ public class RoadNetworkSegmentSource implements PairSegmentSource {
 					Leg leg = new Leg(from, to);
 					GeoPoint start = pointOf(points.get(from));
 					GeoPoint end = pointOf(points.get(to));
-					pending.add(CompletableFuture.supplyAsync(() -> trace(leg, start, end), executor));
+					pending.add(CompletableFuture.supplyAsync(() -> trace(leg, start, end), executor)
+						.whenComplete((result, failure) -> {
+							if (failure == null) {
+								listener.traced(done.incrementAndGet(), steps);
+							}
+						}));
 				}
 			}
 		}
