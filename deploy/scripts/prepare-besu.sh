@@ -3,7 +3,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 DATA_DIR="data/besu"
-IMAGE="hyperledger/besu:latest"
+IMAGE="hyperledger/besu:26.11.0"
 CHAIN_ID="${BESU_CHAIN_ID:-1337}"
 
 if [ -f "$DATA_DIR/genesis.json" ] && [ -f "$DATA_DIR/key" ]; then

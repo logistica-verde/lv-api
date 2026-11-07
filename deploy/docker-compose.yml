@@ -31,7 +31,7 @@ services:
       - /opt/mssql-tools18/bin/sqlcmd -C -S db -U sa -P "$$DB_PASSWORD" -Q "IF DB_ID('logistica_verde') IS NULL CREATE DATABASE logistica_verde"
 
   besu:
-    image: hyperledger/besu:latest
+    image: hyperledger/besu:26.11.0
     restart: unless-stopped
     command:
       - --genesis-file=/config/genesis.json
