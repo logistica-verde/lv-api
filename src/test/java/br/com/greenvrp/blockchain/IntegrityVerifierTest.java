@@ -56,7 +56,7 @@ class IntegrityVerifierTest {
 	@BeforeEach
 	void setUp() {
 		blockchainService = new BlockchainService(
-			operationRepository, recordRepository, attemptRepository, hashGenerator, ledger, transactionManager);
+			operationRepository, recordRepository, attemptRepository, hashGenerator, ledger, transactionManager, 3);
 		verifier = new IntegrityVerifier(
 			operationRepository, recordRepository, hashGenerator, ledger, transactionManager);
 		Vehicle vehicle = vehicleRepository.save(new Vehicle("ABC1D23", 7500.0, "diesel"));
@@ -121,6 +121,21 @@ class IntegrityVerifierTest {
 		assertThat(report.status()).isEqualTo(IntegrityStatus.NOT_ANCHORED);
 		assertThat(report.ledgerHash()).isNull();
 		assertThat(report.databaseHash()).hasSize(64);
+	}
+
+	@Test
+	void reportsAFailedAnchorOnceTheAttemptsRunOut() {
+		ledger.failWith(new LedgerException("Besu is down"));
+		blockchainService.anchorOperation(operationId);
+		blockchainService.retryFailed();
+		blockchainService.retryFailed();
+		ledger.recover();
+
+		IntegrityReport report = verifier.verify(operationId);
+
+		assertThat(report.status()).isEqualTo(IntegrityStatus.ANCHOR_FAILED);
+		assertThat(report.ledgerHash()).isNull();
+		assertThat(report.txHash()).isNull();
 	}
 
 	@Test

@@ -17,6 +17,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class HashGenerator {
 
+	public static final int SERIALIZATION_VERSION = 1;
+
 	private static final int DECIMAL_PLACES = 6;
 
 	public String hash(Operation operation) {

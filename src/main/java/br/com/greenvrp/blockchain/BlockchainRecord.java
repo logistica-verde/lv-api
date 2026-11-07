@@ -45,6 +45,12 @@ public class BlockchainRecord {
 	@Column(name = "mensagem_erro", length = 500)
 	private String mensagemErro;
 
+	@Column(name = "endereco_contrato", length = 42)
+	private String enderecoContrato;
+
+	@Column(name = "versao_serializacao", nullable = false)
+	private int versaoSerializacao = HashGenerator.SERIALIZATION_VERSION;
+
 	protected BlockchainRecord() {
 	}
 
@@ -84,6 +90,16 @@ public class BlockchainRecord {
 		this.timestampRegistro = Instant.now();
 	}
 
+	public void markExhausted(String hashSha256, String message) {
+		markFailed(hashSha256, message);
+		this.status = AnchorStatus.EXHAUSTED;
+	}
+
+	public void recordProvenance(String contractAddress, int serializationVersion) {
+		this.enderecoContrato = contractAddress;
+		this.versaoSerializacao = serializationVersion;
+	}
+
 	public void markDivergent(String hashSha256, String message) {
 		this.hashSha256 = hashSha256;
 		this.status = AnchorStatus.DIVERGENT;
@@ -117,6 +133,14 @@ public class BlockchainRecord {
 
 	public AnchorStatus getStatus() {
 		return status;
+	}
+
+	public String getEnderecoContrato() {
+		return enderecoContrato;
+	}
+
+	public int getVersaoSerializacao() {
+		return versaoSerializacao;
 	}
 
 	public String getMensagemErro() {

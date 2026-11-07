@@ -101,6 +101,12 @@ public class BesuLedger implements Ledger {
 		}
 	}
 
+	@Override
+	public String contractAddress() {
+		String address = properties.contractAddress();
+		return address == null || address.isBlank() ? null : address;
+	}
+
 	private void requireSetting(String value, String name) {
 		if (value == null || value.isBlank()) {
 			throw new LedgerException(name + " is not configured");

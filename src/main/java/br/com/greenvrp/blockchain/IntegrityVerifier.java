@@ -36,24 +36,24 @@ public class IntegrityVerifier {
 		Snapshot snapshot = transactions.execute(status -> {
 			var operation = operationRepository.findById(operationId)
 				.orElseThrow(() -> new ResourceNotFoundException("Route operation %d not found".formatted(operationId)));
-			return new Snapshot(
-				hashGenerator.hash(operation),
-				recordRepository.findByOperationId(operationId).filter(record -> record.getStatus() == AnchorStatus.ANCHORED));
+			return new Snapshot(hashGenerator.hash(operation), recordRepository.findByOperationId(operationId));
 		});
 
 		Optional<String> ledgerHash = ledger.readHash(operationId);
+		boolean gaveUp = snapshot.record().filter(record -> record.getStatus() == AnchorStatus.EXHAUSTED).isPresent();
 		IntegrityStatus status = ledgerHash
 			.map(onLedger -> onLedger.equalsIgnoreCase(snapshot.databaseHash()) ? IntegrityStatus.VALID : IntegrityStatus.TAMPERED)
-			.orElse(IntegrityStatus.NOT_ANCHORED);
+			.orElse(gaveUp ? IntegrityStatus.ANCHOR_FAILED : IntegrityStatus.NOT_ANCHORED);
+		Optional<BlockchainRecord> anchored = snapshot.record().filter(record -> record.getStatus() == AnchorStatus.ANCHORED);
 
 		return new IntegrityReport(
 			operationId,
 			status,
 			snapshot.databaseHash(),
 			ledgerHash.orElse(null),
-			snapshot.record().map(BlockchainRecord::getTxHash).orElse(null),
-			snapshot.record().map(BlockchainRecord::getBlocoLedger).orElse(null),
-			snapshot.record().map(BlockchainRecord::getTimestampRegistro).orElse(null));
+			anchored.map(BlockchainRecord::getTxHash).orElse(null),
+			anchored.map(BlockchainRecord::getBlocoLedger).orElse(null),
+			anchored.map(BlockchainRecord::getTimestampRegistro).orElse(null));
 	}
 
 }
