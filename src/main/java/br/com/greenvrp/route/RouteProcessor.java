@@ -8,6 +8,8 @@ import br.com.greenvrp.optimizer.InvalidOptimizerResponseException;
 import br.com.greenvrp.optimizer.OptimizeRequest;
 import br.com.greenvrp.optimizer.OptimizeResponse;
 import br.com.greenvrp.optimizer.OptimizerClient;
+import br.com.greenvrp.progress.CalculationProgress;
+import br.com.greenvrp.progress.CalculationProgressTracker;
 import br.com.greenvrp.settings.GaSettingsService;
 import br.com.greenvrp.settings.GaSettingsValues;
 import java.util.ArrayList;
@@ -56,6 +58,7 @@ public class RouteProcessor {
 	private final TransactionTemplate transactions;
 	private final Executor executor;
 	private final ApplicationEventPublisher events;
+	private final CalculationProgressTracker progress;
 
 	public RouteProcessor(
 		OperationRepository operationRepository,
@@ -66,7 +69,7 @@ public class RouteProcessor {
 		PlatformTransactionManager transactionManager,
 		Executor executor) {
 		this(operationRepository, pairSegmentSource, optimizerClient, blockchainService, gaSettingsService,
-			transactionManager, executor, event -> { });
+			transactionManager, executor, event -> { }, new CalculationProgressTracker());
 	}
 
 	@Autowired
@@ -78,8 +81,10 @@ public class RouteProcessor {
 		GaSettingsService gaSettingsService,
 		PlatformTransactionManager transactionManager,
 		@Qualifier("routeExecutor") Executor executor,
-		ApplicationEventPublisher events) {
+		ApplicationEventPublisher events,
+		CalculationProgressTracker progress) {
 		this.events = events;
+		this.progress = progress;
 		this.operationRepository = operationRepository;
 		this.pairSegmentSource = pairSegmentSource;
 		this.optimizerClient = optimizerClient;
@@ -90,20 +95,27 @@ public class RouteProcessor {
 	}
 
 	public CompletableFuture<Void> processAsync(Long operationId) {
+		progress.publish(CalculationProgress.queued(operationId));
 		return CompletableFuture.supplyAsync(() -> prepare(operationId), executor)
 			.thenCompose(prepared -> {
 				long startedAt = System.nanoTime();
-				return optimizerClient.optimize(prepared.request())
-					.thenAcceptAsync(response -> complete(operationId, prepared, response, elapsedMillis(startedAt)), executor);
+				return optimizerClient.optimize(prepared.request(), (generation, generations) ->
+						progress.publish(CalculationProgress.optimizing(operationId, generation, generations)))
+					.thenAcceptAsync(response -> {
+						progress.publish(CalculationProgress.saving(operationId));
+						complete(operationId, prepared, response, elapsedMillis(startedAt));
+					}, executor);
 			})
 			.thenApply(done -> true)
 			.exceptionally(error -> {
 				String failure = markFailed(operationId, error);
+				progress.publish(CalculationProgress.failed(operationId));
 				publish(new OperationSettledEvent(operationId, false, failure));
 				return false;
 			})
 			.thenAcceptAsync(completed -> {
 				if (completed) {
+					progress.publish(CalculationProgress.completed(operationId));
 					publish(new OperationSettledEvent(operationId, true, null));
 					blockchainService.anchorOperation(operationId);
 				}
@@ -114,7 +126,9 @@ public class RouteProcessor {
 		return transactions.execute(status -> {
 			Operation operation = loadOperation(operationId);
 			List<DeliveryPoint> points = pointsOf(operation);
-			List<PairSegment> pairs = pairSegmentSource.buildPairSegments(points);
+			progress.publish(CalculationProgress.preparing(operationId, 0, 1));
+			List<PairSegment> pairs = pairSegmentSource.buildPairSegments(points, (done, total) ->
+				progress.publish(CalculationProgress.preparing(operationId, done, total)));
 			GaSettingsValues settings = gaSettingsService.current();
 			OptimizeRequest.GaParams gaParams = new OptimizeRequest.GaParams(
 				settings.populationSize(), settings.generations(), settings.crossoverRate(), settings.mutationRate());

@@ -59,7 +59,7 @@ public class SecurityConfig {
 			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 			.authorizeHttpRequests(requests -> requests
 				.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-				.requestMatchers("/health", "/api/auth/login").permitAll()
+				.requestMatchers("/health", "/api/auth/login", "/ws/calculations").permitAll()
 				.requestMatchers("/api/users/**", "/api/settings/**").hasRole("ADMIN")
 				.requestMatchers(HttpMethod.POST, "/api/vehicles/**").hasRole("ADMIN")
 				.requestMatchers(HttpMethod.PATCH, "/api/vehicles/**").hasRole("ADMIN")

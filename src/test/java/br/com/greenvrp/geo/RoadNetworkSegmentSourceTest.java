@@ -12,6 +12,7 @@ import br.com.greenvrp.deliverypoint.DeliveryPoint;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -57,6 +58,22 @@ class RoadNetworkSegmentSourceTest {
 		assertThat(segments).hasSize(2);
 		assertThat(segments).extracting(PairSegment::fromIndex).containsExactly(0, 1);
 		assertThat(segments).extracting(PairSegment::toIndex).containsExactly(1, 0);
+	}
+
+	@Test
+	void countsEveryTracedRouteAndTheElevationLookupAsProgress() {
+		when(osrmClient.route(any(), any())).thenReturn(northward(100));
+		DeliveryPoint third = new DeliveryPoint("Meio", null, -23.555, -46.63);
+		List<Integer> done = new CopyOnWriteArrayList<>();
+		List<Integer> totals = new CopyOnWriteArrayList<>();
+
+		source.buildPairSegments(List.of(low, high, third), (count, total) -> {
+			done.add(count);
+			totals.add(total);
+		});
+
+		assertThat(done).containsExactly(1, 2, 3, 4, 5, 6, 7);
+		assertThat(totals).containsOnly(7);
 	}
 
 	@Test
