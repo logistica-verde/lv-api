@@ -31,6 +31,7 @@ public class BesuLedger implements Ledger {
 
 	private final Web3j web3j;
 	private final BesuProperties properties;
+	private final Object sending = new Object();
 
 	public BesuLedger(Web3j web3j, BesuProperties properties) {
 		this.web3j = web3j;
@@ -49,9 +50,12 @@ public class BesuLedger implements Ledger {
 		try {
 			RawTransactionManager transactionManager = new RawTransactionManager(
 				web3j, Credentials.create(properties.privateKey()), properties.chainId());
-			EthSendTransaction sent = transactionManager.sendTransaction(
-				properties.gasPrice(), properties.gasLimit(), properties.contractAddress(),
-				FunctionEncoder.encode(function), BigInteger.ZERO);
+			EthSendTransaction sent;
+			synchronized (sending) {
+				sent = transactionManager.sendTransaction(
+					properties.gasPrice(), properties.gasLimit(), properties.contractAddress(),
+					FunctionEncoder.encode(function), BigInteger.ZERO);
+			}
 			if (sent.hasError()) {
 				throw new LedgerException("Besu rejected the anchor transaction: " + sent.getError().getMessage());
 			}
