@@ -84,4 +84,29 @@ class CalculationProgressTrackerTest {
 		assertThat(tracker.latest(2L)).isPresent();
 	}
 
+	@Test
+	void treatsAStageWithNothingToCountAsDone() {
+		assertThat(CalculationProgress.preparing(1L, 0, 0).percent()).isEqualTo(25.0);
+		assertThat(CalculationProgress.optimizing(1L, 0, 0).percent()).isEqualTo(95.0);
+	}
+
+	@Test
+	void onlyTheEndOfTheCalculationIsFinal() {
+		assertThat(CalculationStage.COMPLETED.isFinal()).isTrue();
+		assertThat(CalculationStage.FAILED.isFinal()).isTrue();
+		assertThat(CalculationStage.OPTIMIZING.isFinal()).isFalse();
+	}
+
+	@Test
+	void repeatsTheLastStepOfAStageEvenWithoutAnyPercentChange() {
+		List<CalculationProgress> received = new CopyOnWriteArrayList<>();
+		tracker.subscribe(received::add);
+
+		tracker.publish(CalculationProgress.preparing(1L, 7, 7));
+		tracker.publish(CalculationProgress.preparing(1L, 7, 7));
+		tracker.publish(CalculationProgress.preparing(1L, 6, 7));
+
+		assertThat(received).hasSize(2);
+	}
+
 }

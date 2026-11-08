@@ -125,4 +125,32 @@ class BaseControllerTest {
 			.andExpect(status().isNotFound());
 	}
 
+	@Test
+	@WithMockUser(roles = "ADMIN")
+	void anAdministratorListsTheInactiveBasesToo() throws Exception {
+		DeliveryPoint point = new DeliveryPoint("Base Antiga", null, -23.55, -46.63);
+		Base old = new Base("Base Antiga", null, -23.55, -46.63, point);
+		old.desativar();
+		given(baseRepository.findAllByOrderByNomeAsc()).willReturn(List.of(old));
+
+		mockMvc.perform(get("/api/bases").param("includeInactive", "true"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$[0].nome").value("Base Antiga"))
+			.andExpect(jsonPath("$[0].ativo").value(false));
+	}
+
+	@Test
+	@WithMockUser(roles = "ADMIN")
+	void anAdministratorReactivatesABase() throws Exception {
+		DeliveryPoint point = new DeliveryPoint("Base Central", null, -23.55, -46.63);
+		Base base = new Base("Base Central", null, -23.55, -46.63, point);
+		base.desativar();
+		given(baseRepository.findById(1L)).willReturn(Optional.of(base));
+		given(baseRepository.save(any())).willAnswer(call -> call.getArgument(0));
+
+		mockMvc.perform(patch("/api/bases/1").contentType(MediaType.APPLICATION_JSON).content("{\"ativo\":true}"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.ativo").value(true));
+	}
+
 }
