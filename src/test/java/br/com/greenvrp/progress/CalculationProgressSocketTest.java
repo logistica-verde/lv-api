@@ -130,4 +130,47 @@ class CalculationProgressSocketTest {
 		assertThat(closed.get(5, TimeUnit.SECONDS).getCode()).isEqualTo(CloseStatus.POLICY_VIOLATION.getCode());
 	}
 
+	@Test
+	void closesTheConnectionWhenTheSubscriptionHasNoToken() throws Exception {
+		connect();
+
+		session.sendMessage(new TextMessage("{\"operationIds\":[9301]}"));
+
+		assertThat(closed.get(5, TimeUnit.SECONDS).getCode()).isEqualTo(CloseStatus.POLICY_VIOLATION.getCode());
+	}
+
+	@Test
+	void closesTheConnectionWhenTheOperationsAreTooManyOrInvalid() throws Exception {
+		connect();
+
+		subscribe(token(), 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11);
+
+		assertThat(closed.get(5, TimeUnit.SECONDS).getCode()).isEqualTo(CloseStatus.POLICY_VIOLATION.getCode());
+	}
+
+	@Test
+	void closesTheConnectionWhenAnOperationIdIsNotPositive() throws Exception {
+		connect();
+
+		subscribe(token(), 9401L, 0L);
+
+		assertThat(closed.get(5, TimeUnit.SECONDS).getCode()).isEqualTo(CloseStatus.POLICY_VIOLATION.getCode());
+	}
+
+	@Test
+	void keepsTheFirstSubscriptionAndIgnoresLaterMessages() throws Exception {
+		connect();
+		String token = token();
+		subscribe(token, 9501L);
+		subscribe(token, 9502L);
+		Thread.sleep(200);
+
+		tracker.publish(CalculationProgress.queued(9502L));
+		tracker.publish(CalculationProgress.queued(9501L));
+
+		assertThat(next()).contains("\"operationId\":9501");
+		assertThat(received.poll(300, TimeUnit.MILLISECONDS)).isNull();
+		assertThat(session.isOpen()).isTrue();
+	}
+
 }

@@ -229,4 +229,31 @@ class OptimizerClientTest {
 			.hasMessageContaining("without a result");
 	}
 
+	@Test
+	void failsWhenTheResultEventCarriesNoRoute() throws Exception {
+		OptimizerClient client = clientFor(fakeStream("""
+			{"type":"result"}
+			"""), Duration.ofSeconds(5));
+
+		assertThatThrownBy(() -> client.optimize(sampleRequest(), (generation, generations) -> { })
+			.get(5, TimeUnit.SECONDS))
+			.isInstanceOf(ExecutionException.class)
+			.hasCauseInstanceOf(OptimizerException.class)
+			.hasMessageContaining("Optimizer failed");
+	}
+
+	@Test
+	void doesNotReportAProgressEventWithoutTheGenerations() throws Exception {
+		OptimizerClient client = clientFor(fakeStream("""
+			{"type":"progress"}
+			"""), Duration.ofSeconds(5));
+		List<int[]> reported = new CopyOnWriteArrayList<>();
+
+		assertThatThrownBy(() -> client.optimize(sampleRequest(), (generation, generations) ->
+			reported.add(new int[] {generation, generations})).get(5, TimeUnit.SECONDS))
+			.isInstanceOf(ExecutionException.class)
+			.hasCauseInstanceOf(OptimizerException.class);
+		assertThat(reported).isEmpty();
+	}
+
 }

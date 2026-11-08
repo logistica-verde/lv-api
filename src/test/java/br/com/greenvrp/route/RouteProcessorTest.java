@@ -322,6 +322,81 @@ class RouteProcessorTest {
 	}
 
 	@Test
+	void asksTheOptimizerToFinishAtTheBaseWhenTheRouteEndsThere() {
+		Vehicle vehicle = vehicleRepository.findAll().get(0);
+		List<DeliveryPoint> points = deliveryPointRepository.findAllById(pointIds);
+		Base base = baseRepository.save(new Base("Base Central", null, -23.57, -46.65, points.get(2)));
+		Long replanId = operationRepository
+			.save(Operation.pending(vehicle, OptimizationCriterion.EMISSION, points, null, base))
+			.getId();
+		when(optimizerClient.optimize(any(), any())).thenReturn(CompletableFuture.completedFuture(
+			new OptimizeResponse(
+				List.of(0, 1, 2), 5.5, 2010.0,
+				List.of(new SegmentEmission(0, 1, 2.0), new SegmentEmission(1, 2, 3.5)))));
+
+		processor.processAsync(replanId).join();
+
+		ArgumentCaptor<OptimizeRequest> sent = ArgumentCaptor.forClass(OptimizeRequest.class);
+		verify(optimizerClient).optimize(sent.capture(), any());
+		assertThat(sent.getValue().endIndex()).isEqualTo(2);
+		assertThat(sent.getValue().returnToDepot()).isNull();
+		inTransaction(() -> {
+			assertThat(operationRepository.findById(replanId).orElseThrow().getStatus())
+				.isEqualTo(OperationStatus.COMPLETED);
+			return null;
+		});
+	}
+
+	@Test
+	void keepsOnlyTheFirst500CharactersOfAFailure() {
+		when(optimizerClient.optimize(any(), any())).thenReturn(CompletableFuture.failedFuture(
+			new OptimizerException("x".repeat(800), new RuntimeException())));
+
+		processor.processAsync(operationId).join();
+
+		inTransaction(() -> {
+			assertThat(operationRepository.findById(operationId).orElseThrow().getMensagemErro()).hasSize(500);
+			return null;
+		});
+	}
+
+	@Test
+	void recordsTheCauseOfAFailureThatArrivesWrapped() {
+		when(optimizerClient.optimize(any(), any())).thenReturn(CompletableFuture.failedFuture(
+			new java.util.concurrent.ExecutionException(new IllegalStateException("optimizer worker stopped"))));
+
+		processor.processAsync(operationId).join();
+
+		inTransaction(() -> {
+			assertThat(operationRepository.findById(operationId).orElseThrow().getMensagemErro())
+				.isEqualTo("optimizer worker stopped");
+			return null;
+		});
+	}
+
+	@Test
+	void stillCompletesAndAnchorsWhenAListenerOfTheResultFails() {
+		RouteProcessor withBrokenListener = new RouteProcessor(
+			operationRepository, geoQueryService, optimizerClient, blockchainService, gaSettingsService,
+			transactionManager, Runnable::run, event -> {
+				throw new IllegalStateException("listener down");
+			}, new CalculationProgressTracker());
+		when(optimizerClient.optimize(any(), any())).thenReturn(CompletableFuture.completedFuture(
+			new OptimizeResponse(
+				List.of(0, 1, 2), 5.5, 2010.0,
+				List.of(new SegmentEmission(0, 1, 2.0), new SegmentEmission(1, 2, 3.5)))));
+
+		withBrokenListener.processAsync(operationId).join();
+
+		verify(blockchainService).anchorOperation(operationId);
+		inTransaction(() -> {
+			assertThat(operationRepository.findById(operationId).orElseThrow().getStatus())
+				.isEqualTo(OperationStatus.COMPLETED);
+			return null;
+		});
+	}
+
+	@Test
 	void leavesTheExecutionTimeEmptyWhenTheOperationFails() {
 		when(optimizerClient.optimize(any(), any())).thenReturn(CompletableFuture.failedFuture(
 			new OptimizerException("Optimizer call failed: boom", new RuntimeException())));

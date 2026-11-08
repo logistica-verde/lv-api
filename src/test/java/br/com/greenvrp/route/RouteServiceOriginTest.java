@@ -132,6 +132,51 @@ class RouteServiceOriginTest {
 		assertThatThrownBy(() -> routeService.calculate(alone)).isInstanceOf(InvalidRequestException.class);
 	}
 
+	@Test
+	void replansFromTheCurrentPositionThroughThePendingStops() {
+		Operation replan = routeService.createReplanOperation(
+			vehicle, OptimizationCriterion.DISTANCE, 1200.0, new RouteRequest.Origin(-23.57, -46.65),
+			List.of(second.getId(), first.getId()), null);
+
+		assertThat(replan.getPoints()).hasSize(3);
+		assertThat(replan.getPoints().get(0).getPoint().getLatitude()).isEqualTo(-23.57);
+		assertThat(replan.getPoints().subList(1, 3)).extracting(item -> item.getPoint().getId())
+			.containsExactly(first.getId(), second.getId());
+		assertThat(replan.getCriterio()).isEqualTo(OptimizationCriterion.DISTANCE);
+		assertThat(replan.getCargaKg()).isEqualTo(1200.0);
+		assertThat(replan.isRetornaBase()).isFalse();
+	}
+
+	@Test
+	void aReplanOfARouteWithABaseStillEndsAtTheBase() {
+		Base base = registerBase(true);
+
+		Operation replan = routeService.createReplanOperation(
+			vehicle, OptimizationCriterion.EMISSION, null, new RouteRequest.Origin(-23.57, -46.65),
+			List.of(first.getId()), base);
+
+		assertThat(replan.getPoints()).extracting(item -> item.getPoint().getId())
+			.endsWith(base.getPoint().getId());
+		assertThat(replan.getBase()).isEqualTo(base);
+		assertThat(replan.isRetornaBase()).isTrue();
+	}
+
+	@Test
+	void refusesToReplanFromOutsideTheCoveredArea() {
+		assertThatThrownBy(() -> routeService.createReplanOperation(
+			vehicle, OptimizationCriterion.EMISSION, null, new RouteRequest.Origin(-22.9, -43.2),
+			List.of(first.getId()), null))
+			.isInstanceOf(InvalidRequestException.class);
+	}
+
+	@Test
+	void refusesToReplanThroughAStopThatDoesNotExist() {
+		assertThatThrownBy(() -> routeService.createReplanOperation(
+			vehicle, OptimizationCriterion.EMISSION, null, new RouteRequest.Origin(-23.57, -46.65),
+			List.of(99_999L), null))
+			.isInstanceOf(ResourceNotFoundException.class);
+	}
+
 
 	private Base registerBase(boolean active) {
 		DeliveryPoint basePoint = new DeliveryPoint("Base Central", null, -23.5, -46.6);
