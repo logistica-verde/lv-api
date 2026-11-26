@@ -1,0 +1,46 @@
+#  1 EMISSION 28 pontos  COMPLETED VALID        pronta 21.4 s  ancorada +0.6 s 
+#  1 DISTANCE 28 pontos  COMPLETED VALID        pronta 21.4 s  ancorada +0.5 s 
+#  2 EMISSION 10 pontos  COMPLETED VALID        pronta 8.9 s  ancorada +0.5 s 
+#  2 DISTANCE 10 pontos  COMPLETED VALID        pronta 8.9 s  ancorada +0.5 s 
+#  3 EMISSION 24 pontos  COMPLETED VALID        pronta 11.2 s  ancorada +0.5 s 
+#  3 DISTANCE 24 pontos  COMPLETED VALID        pronta 11.1 s  ancorada +0.5 s 
+#  4 EMISSION 28 pontos  COMPLETED VALID        pronta 11.3 s  ancorada +0.6 s 
+#  4 DISTANCE 28 pontos  COMPLETED VALID        pronta 12.3 s  ancorada +0.5 s 
+#  5 EMISSION 29 pontos  COMPLETED VALID        pronta 11.2 s  ancorada +0.5 s 
+#  5 DISTANCE 29 pontos  COMPLETED VALID        pronta 11.2 s  ancorada +0.5 s 
+#  6 EMISSION 11 pontos  COMPLETED VALID        pronta 8.9 s  ancorada +0.5 s 
+#  6 DISTANCE 11 pontos  COMPLETED VALID        pronta 9.7 s  ancorada +0.5 s 
+#  7 EMISSION 10 pontos  COMPLETED VALID        pronta 9.0 s  ancorada +0.5 s 
+#  7 DISTANCE 10 pontos  COMPLETED VALID        pronta 9.0 s  ancorada +0.6 s 
+#  8 EMISSION 27 pontos  COMPLETED VALID        pronta 10.1 s  ancorada +2.1 s 
+#  8 DISTANCE 27 pontos  COMPLETED VALID        pronta 10.1 s  ancorada +0.5 s 
+#  9 EMISSION 30 pontos  COMPLETED VALID        pronta 11.3 s  ancorada +0.5 s 
+#  9 DISTANCE 30 pontos  COMPLETED VALID        pronta 12.4 s  ancorada +0.5 s 
+# 10 EMISSION 23 pontos  COMPLETED VALID        pronta 9.9 s  ancorada +0.5 s 
+# 10 DISTANCE 23 pontos  COMPLETED VALID        pronta 11.2 s  ancorada +0.5 s 
+# 11 EMISSION 19 pontos  COMPLETED VALID        pronta 9.8 s  ancorada +0.6 s 
+# 11 DISTANCE 19 pontos  COMPLETED VALID        pronta 9.8 s  ancorada +2.1 s 
+# 12 EMISSION 28 pontos  COMPLETED VALID        pronta 9.8 s  ancorada +2.1 s 
+# 12 DISTANCE 28 pontos  COMPLETED VALID        pronta 10.8 s  ancorada +0.5 s 
+# 13 EMISSION 21 pontos  COMPLETED VALID        pronta 9.9 s  ancorada +2.0 s 
+# 13 DISTANCE 21 pontos  COMPLETED VALID        pronta 9.8 s  ancorada +2.0 s 
+# 14 EMISSION 20 pontos  COMPLETED VALID        pronta 9.9 s  ancorada +0.6 s 
+# 14 DISTANCE 20 pontos  COMPLETED VALID        pronta 9.9 s  ancorada +2.1 s 
+# 15 EMISSION 13 pontos  COMPLETED VALID        pronta 8.7 s  ancorada +0.5 s 
+# 15 DISTANCE 13 pontos  COMPLETED VALID        pronta 8.5 s  ancorada +0.5 s 
+# 16 EMISSION 27 pontos  COMPLETED VALID        pronta 9.8 s  ancorada +0.5 s 
+# 16 DISTANCE 27 pontos  COMPLETED VALID        pronta 9.7 s  ancorada +0.5 s 
+# 17 EMISSION 22 pontos  COMPLETED VALID        pronta 9.9 s  ancorada +0.5 s 
+# 17 DISTANCE 22 pontos  COMPLETED VALID        pronta 9.9 s  ancorada +0.5 s 
+# 18 EMISSION 22 pontos  COMPLETED VALID        pronta 10.1 s  ancorada +0.5 s 
+# 18 DISTANCE 22 pontos  COMPLETED VALID        pronta 8.7 s  ancorada +0.5 s 
+# 19 EMISSION 12 pontos  COMPLETED VALID        pronta 8.7 s  ancorada +0.5 s 
+# 19 DISTANCE 12 pontos  COMPLETED VALID        pronta 8.5 s  ancorada +0.5 s 
+# 20 EMISSION 17 pontos  COMPLETED VALID        pronta 8.9 s  ancorada +0.5 s 
+# 20 DISTANCE 17 pontos  COMPLETED VALID        pronta 8.9 s  ancorada +0.5 s 
+
+40 operações em 20 execuções, 1 ao mesmo tempo, 231.2 s no total
+Envio -> rota pronta: p50 9.88 s · p95 12.36 s · máx 21.44 s · média 10.51 s (n = 40)
+Rota pronta -> ancoragem confirmada: p50 0.53 s · p95 2.06 s · máx 2.08 s · média 0.76 s (n = 40)
+Falhas: 0
+CSV: C:\Users\Usuario\lv-api\docs\tempo-ponta-a-ponta\aws-2026-11-08-1-por-vez.csv

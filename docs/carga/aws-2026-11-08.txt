@@ -1,0 +1,9 @@
+Par de referência: operações 91 e 92
+
+10 usuários, 121.0 s, intervalo de 0.5 s
+endpoint    requisições    2xx falhas   p50 ms   p95 ms    média      máx
+calculate           100    100      0    584.2    698.9    590.0    768.9
+route               311    311      0    704.0    778.1    712.1    836.8
+integrity           310    310      0    554.3    628.1    562.5    667.6
+comparison          315    315      0    711.8    796.7    721.2    907.2
+JSON: C:\Users\Usuario\lv-api\docs\carga\aws-2026-11-08.json

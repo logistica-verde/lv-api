@@ -1,0 +1,49 @@
+{
+  "base_url": "servidor da AWS (us-east-2)",
+  "users": 10,
+  "duration_s": 121.0,
+  "think_s": 0.5,
+  "post_every": 10,
+  "reference_operations": [
+    91,
+    92
+  ],
+  "endpoints": {
+    "calculate": {
+      "requests": 100,
+      "ok": 100,
+      "failures": 0,
+      "p50": 584.2,
+      "p95": 698.9,
+      "mean": 590.0,
+      "max": 768.9
+    },
+    "route": {
+      "requests": 311,
+      "ok": 311,
+      "failures": 0,
+      "p50": 704.0,
+      "p95": 778.1,
+      "mean": 712.1,
+      "max": 836.8
+    },
+    "integrity": {
+      "requests": 310,
+      "ok": 310,
+      "failures": 0,
+      "p50": 554.3,
+      "p95": 628.1,
+      "mean": 562.5,
+      "max": 667.6
+    },
+    "comparison": {
+      "requests": 315,
+      "ok": 315,
+      "failures": 0,
+      "p50": 711.8,
+      "p95": 796.7,
+      "mean": 721.2,
+      "max": 907.2
+    }
+  }
+}
